@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#08131f">
+  <meta name="description" content="SailLab — registrazione e analisi delle sessioni di vela, con dati salvati localmente.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <title>SailLab</title>
+</head>
+<body>
+  <header class="topbar">
+    <div><div class="eyebrow">SAILLAB / PERFORMANCE</div><h1>SailLab</h1></div>
+    <div id="gpsBadge" class="status"><span class="dot"></span> GPS inattivo</div>
+  </header>
+
+  <main>
+    <section id="view-live" class="view active">
+      <div class="section-head"><div><p class="eyebrow">DATI IN TEMPO REALE</p><h2>Live</h2></div><div class="muted small" id="sampleRate">— Hz effettivi</div></div>
+      <div class="hero-metric panel">
+        <div class="metric-label">VELOCITÀ GPS <span>SOG</span></div>
+        <div class="hero-value"><span id="sog">—</span><small>kn</small></div>
+        <div class="metric-foot"><span>Media <b id="avgSpeed">—</b> kn</span><span>Massima <b id="maxSpeed">—</b> kn</span></div>
+      </div>
+      <div class="metric-grid">
+        <div class="panel metric"><span class="metric-label">ROTTA GPS</span><strong id="course">—<small>°</small></strong><span class="muted small">Direzione sul fondo</span></div>
+        <div class="panel metric"><span class="metric-label">PRECISIONE GPS</span><strong id="accuracy">—<small> m</small></strong><span class="muted small">Accuratezza dichiarata</span></div>
+        <div class="panel metric"><span class="metric-label">DURATA</span><strong id="duration">00:00</strong><span class="muted small">Sessione corrente</span></div>
+        <div class="panel metric"><span class="metric-label">CAMPIONI</span><strong id="samples">0</strong><span class="muted small">Campioni registrati</span></div>
+      </div>
+      <div class="panel position"><div><span class="metric-label">POSIZIONE GPS</span><strong id="coords">In attesa del GPS</strong></div><button class="secondary" id="refreshGps">Attiva GPS</button></div>
+      <div class="notice" id="sensorNotice">Heel, pitch, heading bussola e accelerazioni non sono disponibili in questa versione base. La rotta mostrata è il course GPS, non l’orientamento della prua.</div>
+      <div class="panel controls">
+        <button class="primary" id="startBtn">▶ Avvia sessione</button>
+        <div class="button-row"><button class="secondary" id="pauseBtn" disabled>Ⅱ Pausa</button><button class="secondary" id="resumeBtn" disabled>▶ Riprendi</button><button class="danger" id="stopBtn" disabled>■ Termina</button></div>
+      </div>
+    </section>
+
+    <section id="view-session" class="view">
+      <div class="section-head"><div><p class="eyebrow">REGISTRAZIONE</p><h2>Sessione</h2></div></div>
+      <div class="panel form-panel">
+        <label>Nome sessione<input id="sessionName" placeholder="Allenamento mattina" value="Sessione vela"></label>
+        <div class="form-grid"><label>Barca / modello<input id="boat" placeholder="Es. 49er"></label><label>Classe<input id="boatClass" placeholder="Es. 49er"></label></div>
+        <div class="form-grid"><label>Equipaggio<input id="crew" placeholder="Nomi equipaggio"></label><label>Luogo<input id="location" placeholder="Porto / campo di regata"></label></div>
+        <label>Vento stimato (kn)<input id="wind" type="number" min="0" step="0.5" placeholder="Non obbligatorio"></label>
+        <label>Setup e regolazioni<textarea id="setup" rows="3" placeholder="Vele, rig, rake, carrello..."></textarea></label>
+        <label>Note<textarea id="notes" rows="3" placeholder="Condizioni, obiettivi, osservazioni..."></textarea></label>
+        <p class="muted small">I dati sono salvati in questo browser sul dispositivo. Non vengono inviati a un server.</p>
+      </div>
+      <div class="panel controls">
+        <h3>Registra un evento</h3>
+        <div class="event-grid">
+          <button class="event-btn" data-event="Virata">↶ Virata</button><button class="event-btn" data-event="Strambata">↷ Strambata</button>
+          <button class="event-btn" data-event="Partenza">⚑ Partenza</button><button class="event-btn" data-event="Cambio regolazione">⚙ Regolazione</button>
+          <button class="event-btn" data-event="Salto di vento">↗ Salto vento</button><button class="event-btn" data-event="Inizio bordo">⇢ Inizio bordo</button>
+        </div>
+        <label>Evento personalizzato<input id="customEvent" placeholder="Nome evento"></label><button id="customEventBtn" class="secondary full">+ Registra evento personalizzato</button>
+        <label>Nota rapida<textarea id="quickNote" rows="2" placeholder="Aggiungi un'osservazione..."></textarea></label><button id="noteBtn" class="secondary full">+ Salva nota con posizione</button>
+      </div>
+    </section>
+
+    <section id="view-analysis" class="view">
+      <div class="section-head"><div><p class="eyebrow">DATI RACCOLTI</p><h2>Analisi</h2></div></div>
+      <div id="analysisEmpty" class="panel empty">Avvia o importa una sessione per vedere le statistiche.</div>
+      <div id="analysisContent" hidden>
+        <div class="metric-grid">
+          <div class="panel metric"><span class="metric-label">CAMPIONI VALIDi</span><strong id="aCount">0</strong></div>
+          <div class="panel metric"><span class="metric-label">DISTANZA</span><strong id="distance">—<small> nm</small></strong></div>
+          <div class="panel metric"><span class="metric-label">VELOCITÀ MEDIA</span><strong id="aMean">—<small> kn</small></strong></div>
+          <div class="panel metric"><span class="metric-label">DEV. STANDARD</span><strong id="aStd">—<small> kn</small></strong></div>
+        </div>
+        <div class="panel"><h3>Velocità nel tempo</h3><canvas id="speedChart" height="180" aria-label="Grafico velocità GPS"></canvas><p class="muted small">Grafico disegnato dai campioni reali della sessione selezionata.</p></div>
+        <div class="panel"><h3>Campioni recenti</h3><div class="table-wrap"><table><thead><tr><th>Ora</th><th>SOG (kn)</th><th>Rotta GPS</th><th>Precisione (m)</th></tr></thead><tbody id="sampleRows"></tbody></table></div></div>
+      </div>
+    </section>
+
+    <section id="view-wind" class="view">
+      <div class="section-head"><div><p class="eyebrow">ANALISI TRA LE MURE</p><h2>Vento</h2></div></div>
+      <div class="panel">
+        <p>Marca manualmente i bordi mentre navighi. SailLab può confrontare le rotte GPS registrate, ma la bisettrice geometrica non equivale necessariamente alla direzione reale del vento.</p>
+        <div class="button-row"><button id="portTack" class="secondary">Mura sinistra</button><button id="starboardTack" class="secondary">Mura dritta</button></div>
+        <div class="metric-grid top-space">
+          <div class="panel inset"><span class="metric-label">BORDI SINISTRA</span><strong id="portCount">0</strong></div>
+          <div class="panel inset"><span class="metric-label">BORDI DRITTA</span><strong id="starboardCount">0</strong></div>
+        </div>
+        <p id="windResult" class="notice">Dati insufficienti per una stima. Registra e marca almeno un intervallo per ciascuna mura.</p>
+      </div>
+      <div class="panel"><h3>Limitazioni della stima</h3><p class="muted">La rotta GPS è la traiettoria sul fondo; può differire dall'heading della barca per corrente e scarroccio. Senza vento apparente/reale, bussola e segmenti di bolina identificati con criterio, non viene calcolata una direzione del vento.</p></div>
+    </section>
+
+    <section id="view-data" class="view">
+      <div class="section-head"><div><p class="eyebrow">ARCHIVIO LOCALE</p><h2>Dati</h2></div></div>
+      <div class="panel">
+        <h3>Sessioni salvate</h3><div id="sessionsList" class="sessions-list"><p class="muted">Nessuna sessione salvata.</p></div>
+      </div>
+      <div class="panel">
+        <h3>Esportazione e importazione</h3>
+        <p class="muted small">Esporta la sessione corrente o una sessione dallo storico. L'importazione GPX conserva timestamp, coordinate e altitudine se presenti; non crea dati mancanti.</p>
+        <div class="button-row"><button id="exportJson" class="secondary">Esporta JSON</button><button id="exportCsv" class="secondary">Esporta CSV</button></div>
+        <label class="file-label">Importa traccia GPX<input type="file" id="gpxInput" accept=".gpx,application/gpx+xml"></label>
+        <div id="importMessage" class="muted small"></div>
+      </div>
+      <div class="panel">
+        <h3>Backup completo</h3><button id="backupBtn" class="primary full">Scarica tutte le sessioni (JSON)</button>
+        <p class="muted small">Conserva periodicamente un backup: la cancellazione dei dati del browser può eliminare le sessioni.</p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Navigazione principale">
+    <button class="nav-item active" data-view="live"><span>◉</span>LIVE</button>
+    <button class="nav-item" data-view="session"><span>⏱</span>SESSIONE</button>
+    <button class="nav-item" data-view="analysis"><span>⌁</span>ANALISI</button>
+    <button class="nav-item" data-view="wind"><span>◈</span>VENTO</button>
+    <button class="nav-item" data-view="data"><span>▤</span>DATI</button>
+  </nav>
+  <div id="toast" role="status" class="toast" aria-live="polite"></div>
+  <script src="./app.js"></script>
+</body>
+</html>
