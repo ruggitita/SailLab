@@ -1,12 +1,12 @@
 {
   "name": "SailLab",
   "short_name": "SailLab",
-  "description": "Registrazione e analisi delle sessioni di vela",
+  "description": "Sailing session recording, race timing and performance analysis",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#08131f",
-  "theme_color": "#08131f",
+  "background_color": "#071827",
+  "theme_color": "#071827",
   "orientation": "any",
   "icons": [
     {
