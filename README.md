@@ -53,3 +53,21 @@ The app reads `DeviceOrientationEvent` angles from the phone. These are **phone 
 
 ## Important screen-lock distinction
 The in-app lock is not an operating-system security lock and does not prevent the user from leaving the app or using device controls. It only blocks accidental touches inside the SailLab page. The web app cannot guarantee recording while backgrounded or screen-locked by the OS.
+
+
+## Race line, wind shifts and custom cockpit (new)
+
+- **Start line:** tap **Enable GPS** and wait for a fix, then tap **Ping committee boat** at the committee end and **Ping pin** at the pin end. Set the seconds to the gun and start the countdown. The app shows line-segment distance, line length, estimated time to the line at current SOG, and the time to burn (countdown minus estimated arrival time). Endpoints and countdown duration are saved locally.
+- **Map:** the race and cockpit maps show the boat position, committee boat, pin, and start line. Map tiles are provided by OpenStreetMap and need an internet connection. GPS needs HTTPS and browser location permission.
+- **Wind shifts:** start a session, record GPS while sailing a steady upwind leg, and tap the relevant port/starboard button when settling onto each tack. When switching to the other tack, the previous leg is finalized. After at least one usable leg on each tack, the app estimates wind direction from the bisector of average COGs. Tap **Set current direction as baseline** to display subsequent clockwise/right and counter-clockwise/left shifts. For better estimates, sail steady legs and use multiple tacks.
+- **Cockpit widgets:** open **Cockpit → Edit widgets** to show/hide cards. Drag cards to reorder them. The layout is saved locally. The cockpit includes a map, SOG/COG, heel, pitch, wind shift, start-line timing, a trend chart, and a manual trim logger.
+- **Trim:** there is no trim sensor connected in this build. Enter trim values or a consistent trim score manually; the app calculates their average and plots logged values alongside heel readings. Trim readings are stored locally on this device.
+
+### Tactical limitations
+The start-line time estimate assumes direct approach at constant current GPS speed; it does not account for approach angle, acceleration, current, manoeuvres or boat-specific start strategy. The line distance is the shortest distance to the finite segment between the two pinged endpoints. Wind direction is a GPS-course bisector estimate, not a measured wind vane/anemometer reading. GPS COG can be affected by current and leeway. Use these tools as tactical aids, verify readings on the water, and do not rely on them for navigation or safety-critical decisions.
+
+
+## Latest race workflow
+The front-end interface is in English. The Start Line page supports a countdown, one-minute adjustments, and a Sync action. When the countdown reaches zero, the app automatically opens the Cockpit. Wind-shift controls are integrated into the Cockpit's Wind widget; the separate Wind navigation item has been removed.
+
+Sync snaps a running countdown down to the next whole-minute mark: for example, 03:20 becomes 03:00. If the countdown is not running, it rounds the selected duration down to a whole minute without starting it. It does not receive an official race committee signal.
