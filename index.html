@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#08131f">
-  <meta name="description" content="SailLab — registrazione e analisi delle sessioni di vela, con dati salvati localmente.">
+  <meta name="description" content="SailLab — sailing session recording and performance analysis, stored locally.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
@@ -13,109 +13,133 @@
 <body>
   <header class="topbar">
     <div><div class="eyebrow">SAILLAB / PERFORMANCE</div><h1>SailLab</h1></div>
-    <div id="gpsBadge" class="status"><span class="dot"></span> GPS inattivo</div>
+    <div id="gpsBadge" class="status"><span class="dot"></span> GPS inactive</div>
   </header>
 
   <main>
     <section id="view-live" class="view active">
-      <div class="section-head"><div><p class="eyebrow">DATI IN TEMPO REALE</p><h2>Live</h2></div><div class="muted small" id="sampleRate">— Hz effettivi</div></div>
-      <div class="hero-metric panel">
-        <div class="metric-label">VELOCITÀ GPS <span>SOG</span></div>
+      <div class="section-head"><div><p class="eyebrow">LIVE DATA</p><h2>Live</h2></div><div class="muted small" id="sampleRate">— Hz actual</div></div>
+      <div class="hero-metric panel widget-card" data-widget="sog" id="widget-sog">
+        <div class="metric-label">GPS SPEED <span>SOG</span></div>
         <div class="hero-value"><span id="sog">—</span><small>kn</small></div>
-        <div class="metric-foot"><span>Media <b id="avgSpeed">—</b> kn</span><span>Massima <b id="maxSpeed">—</b> kn</span></div>
+        <div class="metric-foot"><span>Average <b id="avgSpeed">—</b> kn</span><span>Maximum <b id="maxSpeed">—</b> kn</span></div>
       </div>
       <div class="metric-grid">
-        <div class="panel metric"><span class="metric-label">ROTTA GPS</span><strong id="course">—<small>°</small></strong><span class="muted small">Direzione sul fondo</span></div>
-        <div class="panel metric"><span class="metric-label">PRECISIONE GPS</span><strong id="accuracy">—<small> m</small></strong><span class="muted small">Accuratezza dichiarata</span></div>
-        <div class="panel metric"><span class="metric-label">DURATA</span><strong id="duration">00:00</strong><span class="muted small">Sessione corrente</span></div>
-        <div class="panel metric"><span class="metric-label">CAMPIONI</span><strong id="samples">0</strong><span class="muted small">Campioni registrati</span></div>
+        <div class="panel metric widget-card" data-widget="course" id="widget-course"><span class="metric-label">COG</span><strong id="course">—<small>°</small></strong><span class="muted small">Direction over ground</span></div>
+        <div class="panel metric widget-card" data-widget="accuracy" id="widget-accuracy"><span class="metric-label">GPS ACCURACY</span><strong id="accuracy">—<small> m</small></strong><span class="muted small">Reported accuracy</span></div>
+        <div class="panel metric widget-card" data-widget="heel" id="widget-heel"><span class="metric-label">HEEL</span><strong id="heel">—<small>°</small></strong><span class="muted small">Phone roll estimate</span></div>
+        <div class="panel metric widget-card" data-widget="pitch" id="widget-pitch"><span class="metric-label">PITCH</span><strong id="pitch">—<small>°</small></strong><span class="muted small">Phone pitch estimate</span></div>
+        <div class="panel metric widget-card" data-widget="duration" id="widget-duration"><span class="metric-label">DURATION</span><strong id="duration">00:00</strong><span class="muted small">Current session</span></div>
+        <div class="panel metric widget-card" data-widget="samples" id="widget-samples"><span class="metric-label">SAMPLES</span><strong id="samples">0</strong><span class="muted small">Recorded samples</span></div>
       </div>
-      <div class="panel position"><div><span class="metric-label">POSIZIONE GPS</span><strong id="coords">In attesa del GPS</strong></div><button class="secondary" id="refreshGps">Attiva GPS</button></div>
-      <div class="notice" id="sensorNotice">Heel, pitch, heading bussola e accelerazioni non sono disponibili in questa versione base. La rotta mostrata è il course GPS, non l’orientamento della prua.</div>
+      <div class="panel position"><div><span class="metric-label">GPS POSITION</span><strong id="coords">Waiting for GPS</strong></div><button class="secondary" id="refreshGps">Enable GPS</button></div>
+      <div class="notice" id="sensorNotice">Heel and pitch are read from phone motion/orientation sensors when available. The phone must be securely mounted and aligned with the boat; readings are phone orientation, not calibrated marine instruments. COG is course over ground, not bow heading.</div>
       <div class="panel controls">
-        <button class="primary" id="startBtn">▶ Avvia sessione</button>
-        <div class="button-row"><button class="secondary" id="pauseBtn" disabled>Ⅱ Pausa</button><button class="secondary" id="resumeBtn" disabled>▶ Riprendi</button><button class="danger" id="stopBtn" disabled>■ Termina</button></div>
+        <h3>Sensor calibration & display</h3>
+        <div class="button-row"><button class="secondary" id="zeroHeelBtn">Set HEEL zero</button><button class="secondary" id="zeroPitchBtn">Set PITCH zero</button></div>
+        <p class="muted small" id="zeroStatus">Zero offsets: not calibrated.</p>
+        <div class="button-row"><button class="secondary" id="lockScreenBtn">Lock screen</button><button class="secondary" id="wakeLockBtn">Keep screen awake</button></div>
+        <p class="muted small">Screen lock blocks accidental touches. Unlock by tapping the lock screen 3 times. Hardware volume-button unlocking is not available in a standard web app.</p>
+        <h3>Customize LIVE widgets</h3>
+        <label>Widget<select id="widgetSelect"><option value="sog">SOG / GPS speed</option><option value="course">COG</option><option value="accuracy">GPS accuracy</option><option value="heel">HEEL</option><option value="pitch">PITCH</option><option value="duration">Duration</option><option value="samples">Samples</option></select></label>
+        <div class="form-grid">
+          <label>Widget width<select id="widgetWidth"><option value="half">Half width</option><option value="full">Full width</option></select></label>
+          <label>Font size<select id="widgetFont"><option value="small">Small</option><option value="medium" selected>Medium</option><option value="large">Large</option><option value="xlarge">Extra large</option></select></label>
+        </div>
+        <div class="form-grid">
+          <label>Background color<input id="widgetBg" type="color" value="#101f2e"></label>
+          <label>Text color<input id="widgetColor" type="color" value="#f1f6fa"></label>
+        </div>
+        <div class="button-row"><button class="secondary" id="widgetUp">Move up</button><button class="secondary" id="widgetDown">Move down</button></div>
+        <div class="button-row"><button class="secondary" id="widgetHide">Hide / show</button><button class="secondary" id="widgetReset">Reset layout</button></div>
+        <p class="muted small">Widget layout and colors are saved locally in this browser.</p>
+        <button class="secondary full" id="sensorBtn">Enable motion sensors</button><p class="muted small">Securely mount the phone and align its axes with the boat. Values may require calibration.</p>
+        <button class="primary" id="startBtn">▶ Start session</button>
+        <div class="button-row"><button class="secondary" id="pauseBtn" disabled>Ⅱ Pause</button><button class="secondary" id="resumeBtn" disabled>▶ Resume</button><button class="danger" id="stopBtn" disabled>■ Finish</button></div>
       </div>
     </section>
 
     <section id="view-session" class="view">
-      <div class="section-head"><div><p class="eyebrow">REGISTRAZIONE</p><h2>Sessione</h2></div></div>
+      <div class="section-head"><div><p class="eyebrow">SESSION RECORDING</p><h2>Session</h2></div></div>
       <div class="panel form-panel">
-        <label>Nome sessione<input id="sessionName" placeholder="Allenamento mattina" value="Sessione vela"></label>
-        <div class="form-grid"><label>Barca / modello<input id="boat" placeholder="Es. 49er"></label><label>Classe<input id="boatClass" placeholder="Es. 49er"></label></div>
-        <div class="form-grid"><label>Equipaggio<input id="crew" placeholder="Nomi equipaggio"></label><label>Luogo<input id="location" placeholder="Porto / campo di regata"></label></div>
-        <label>Vento stimato (kn)<input id="wind" type="number" min="0" step="0.5" placeholder="Non obbligatorio"></label>
-        <label>Setup e regolazioni<textarea id="setup" rows="3" placeholder="Vele, rig, rake, carrello..."></textarea></label>
-        <label>Note<textarea id="notes" rows="3" placeholder="Condizioni, obiettivi, osservazioni..."></textarea></label>
-        <p class="muted small">I dati sono salvati in questo browser sul dispositivo. Non vengono inviati a un server.</p>
+        <label>Session name<input id="sessionName" placeholder="Morning training" value="Sailing session"></label>
+        <div class="form-grid"><label>Boat / model<input id="boat" placeholder="e.g. 49er"></label><label>Class<input id="boatClass" placeholder="e.g. 49er"></label></div>
+        <div class="form-grid"><label>Crew<input id="crew" placeholder="Crew names"></label><label>Location<input id="location" placeholder="Harbour / sailing area"></label></div>
+        <label>Estimated wind (kn)<input id="wind" type="number" min="0" step="0.5" placeholder="Optional"></label>
+        <label>Setup and tuning<textarea id="setup" rows="3" placeholder="Sails, rig, rake, traveller..."></textarea></label>
+        <label>Note<textarea id="notes" rows="3" placeholder="Conditions, goals, observations..."></textarea></label>
+        <p class="muted small">Data is stored locally in this browser on this device. Nothing is sent to a server.</p>
       </div>
       <div class="panel controls">
-        <h3>Registra un evento</h3>
+        <h3>Log an event</h3>
         <div class="event-grid">
-          <button class="event-btn" data-event="Virata">↶ Virata</button><button class="event-btn" data-event="Strambata">↷ Strambata</button>
-          <button class="event-btn" data-event="Partenza">⚑ Partenza</button><button class="event-btn" data-event="Cambio regolazione">⚙ Regolazione</button>
-          <button class="event-btn" data-event="Salto di vento">↗ Salto vento</button><button class="event-btn" data-event="Inizio bordo">⇢ Inizio bordo</button>
+          <button class="event-btn" data-event="Tack">↶ Tack</button><button class="event-btn" data-event="Gybe">↷ Gybe</button>
+          <button class="event-btn" data-event="Start">⚑ Start</button><button class="event-btn" data-event="Tuning change">⚙ Tuning change</button>
+          <button class="event-btn" data-event="Wind shift">↗ Wind shift</button><button class="event-btn" data-event="Start leg">⇢ Start leg</button>
         </div>
-        <label>Evento personalizzato<input id="customEvent" placeholder="Nome evento"></label><button id="customEventBtn" class="secondary full">+ Registra evento personalizzato</button>
-        <label>Nota rapida<textarea id="quickNote" rows="2" placeholder="Aggiungi un'osservazione..."></textarea></label><button id="noteBtn" class="secondary full">+ Salva nota con posizione</button>
+        <label>Custom event<input id="customEvent" placeholder="Event name"></label><button id="customEventBtn" class="secondary full">+ Log custom event</button>
+        <label>Quick note<textarea id="quickNote" rows="2" placeholder="Add a note..."></textarea></label><button id="noteBtn" class="secondary full">+ Save note with position</button>
       </div>
     </section>
 
     <section id="view-analysis" class="view">
-      <div class="section-head"><div><p class="eyebrow">DATI RACCOLTI</p><h2>Analisi</h2></div></div>
-      <div id="analysisEmpty" class="panel empty">Avvia o importa una sessione per vedere le statistiche.</div>
+      <div class="section-head"><div><p class="eyebrow">RECORDED DATA</p><h2>Analysis</h2></div></div>
+      <div id="analysisEmpty" class="panel empty">Start or import a session to see statistics.</div>
       <div id="analysisContent" hidden>
         <div class="metric-grid">
-          <div class="panel metric"><span class="metric-label">CAMPIONI VALIDi</span><strong id="aCount">0</strong></div>
-          <div class="panel metric"><span class="metric-label">DISTANZA</span><strong id="distance">—<small> nm</small></strong></div>
-          <div class="panel metric"><span class="metric-label">VELOCITÀ MEDIA</span><strong id="aMean">—<small> kn</small></strong></div>
-          <div class="panel metric"><span class="metric-label">DEV. STANDARD</span><strong id="aStd">—<small> kn</small></strong></div>
+          <div class="panel metric"><span class="metric-label">SAMPLES VALIDi</span><strong id="aCount">0</strong></div>
+          <div class="panel metric"><span class="metric-label">DISTANCE</span><strong id="distance">—<small> nm</small></strong></div>
+          <div class="panel metric"><span class="metric-label">AVERAGE SPEED</span><strong id="aMean">—<small> kn</small></strong></div>
+          <div class="panel metric"><span class="metric-label">STD. DEVIATION</span><strong id="aStd">—<small> kn</small></strong></div>
         </div>
-        <div class="panel"><h3>Velocità nel tempo</h3><canvas id="speedChart" height="180" aria-label="Grafico velocità GPS"></canvas><p class="muted small">Grafico disegnato dai campioni reali della sessione selezionata.</p></div>
-        <div class="panel"><h3>Campioni recenti</h3><div class="table-wrap"><table><thead><tr><th>Ora</th><th>SOG (kn)</th><th>Rotta GPS</th><th>Precisione (m)</th></tr></thead><tbody id="sampleRows"></tbody></table></div></div>
+        <div class="panel"><h3>Speed over time</h3><canvas id="speedChart" height="180" aria-label="GPS speed chart"></canvas><p class="muted small">Chart based on real samples from the selected session.</p></div>
+        <div class="panel"><h3>Recent samples</h3><div class="table-wrap"><table><thead><tr><th>Time</th><th>SOG (kn)</th><th>COG</th><th>Accuracy (m)</th></tr></thead><tbody id="sampleRows"></tbody></table></div></div>
       </div>
     </section>
 
     <section id="view-wind" class="view">
-      <div class="section-head"><div><p class="eyebrow">ANALISI TRA LE MURE</p><h2>Vento</h2></div></div>
+      <div class="section-head"><div><p class="eyebrow">TACK COMPARISON</p><h2>Wind</h2></div></div>
       <div class="panel">
-        <p>Marca manualmente i bordi mentre navighi. SailLab può confrontare le rotte GPS registrate, ma la bisettrice geometrica non equivale necessariamente alla direzione reale del vento.</p>
-        <div class="button-row"><button id="portTack" class="secondary">Mura sinistra</button><button id="starboardTack" class="secondary">Mura dritta</button></div>
+        <p>Mark legs manually while sailing. SailLab can store manual tack markers, but the geometric bisector of GPS courses is not necessarily the true wind direction.</p>
+        <div class="button-row"><button id="portTack" class="secondary">Port tack</button><button id="starboardTack" class="secondary">Starboard tack</button></div>
         <div class="metric-grid top-space">
-          <div class="panel inset"><span class="metric-label">BORDI SINISTRA</span><strong id="portCount">0</strong></div>
-          <div class="panel inset"><span class="metric-label">BORDI DRITTA</span><strong id="starboardCount">0</strong></div>
+          <div class="panel inset"><span class="metric-label">PORT TACK MARKS</span><strong id="portCount">0</strong></div>
+          <div class="panel inset"><span class="metric-label">STARBOARD TACK MARKS</span><strong id="starboardCount">0</strong></div>
         </div>
-        <p id="windResult" class="notice">Dati insufficienti per una stima. Registra e marca almeno un intervallo per ciascuna mura.</p>
+        <p id="windResult" class="notice">Not enough data for an estimate. Record and mark at least one interval on each tack.</p>
       </div>
-      <div class="panel"><h3>Limitazioni della stima</h3><p class="muted">La rotta GPS è la traiettoria sul fondo; può differire dall'heading della barca per corrente e scarroccio. Senza vento apparente/reale, bussola e segmenti di bolina identificati con criterio, non viene calcolata una direzione del vento.</p></div>
+      <div class="panel"><h3>Estimation limitations</h3><p class="muted">GPS COG is the track over ground; it can differ from the boat heading due to current and leeway. Without apparent/true wind, a compass, and identified upwind legs, this app does not calculate wind direction.</p></div>
     </section>
 
     <section id="view-data" class="view">
-      <div class="section-head"><div><p class="eyebrow">ARCHIVIO LOCALE</p><h2>Dati</h2></div></div>
+      <div class="section-head"><div><p class="eyebrow">LOCAL ARCHIVE</p><h2>Data</h2></div></div>
       <div class="panel">
-        <h3>Sessioni salvate</h3><div id="sessionsList" class="sessions-list"><p class="muted">Nessuna sessione salvata.</p></div>
+        <h3>Saved sessions</h3><div id="sessionsList" class="sessions-list"><p class="muted">No saved sessions.</p></div>
       </div>
       <div class="panel">
-        <h3>Esportazione e importazione</h3>
-        <p class="muted small">Esporta la sessione corrente o una sessione dallo storico. L'importazione GPX conserva timestamp, coordinate e altitudine se presenti; non crea dati mancanti.</p>
-        <div class="button-row"><button id="exportJson" class="secondary">Esporta JSON</button><button id="exportCsv" class="secondary">Esporta CSV</button></div>
-        <label class="file-label">Importa traccia GPX<input type="file" id="gpxInput" accept=".gpx,application/gpx+xml"></label>
+        <h3>Export and import</h3>
+        <p class="muted small">Export the current session or a session from history. GPX import preserves timestamps, coordinates and altitude when present; missing values are not fabricated.</p>
+        <div class="button-row"><button id="exportJson" class="secondary">Export JSON</button><button id="exportCsv" class="secondary">Export CSV</button></div>
+        <label class="file-label">Import GPX track<input type="file" id="gpxInput" accept=".gpx,application/gpx+xml"></label>
         <div id="importMessage" class="muted small"></div>
       </div>
       <div class="panel">
-        <h3>Backup completo</h3><button id="backupBtn" class="primary full">Scarica tutte le sessioni (JSON)</button>
-        <p class="muted small">Conserva periodicamente un backup: la cancellazione dei dati del browser può eliminare le sessioni.</p>
+        <h3>Full backup</h3><button id="backupBtn" class="primary full">Download all sessions (JSON)</button>
+        <p class="muted small">Keep regular backups: clearing browser data may delete sessions.</p>
       </div>
     </section>
   </main>
 
-  <nav class="bottom-nav" aria-label="Navigazione principale">
+  <nav class="bottom-nav" aria-label="Main navigation">
     <button class="nav-item active" data-view="live"><span>◉</span>LIVE</button>
-    <button class="nav-item" data-view="session"><span>⏱</span>SESSIONE</button>
-    <button class="nav-item" data-view="analysis"><span>⌁</span>ANALISI</button>
-    <button class="nav-item" data-view="wind"><span>◈</span>VENTO</button>
-    <button class="nav-item" data-view="data"><span>▤</span>DATI</button>
+    <button class="nav-item" data-view="session"><span>⏱</span>SESSION</button>
+    <button class="nav-item" data-view="analysis"><span>⌁</span>ANALYSIS</button>
+    <button class="nav-item" data-view="wind"><span>◈</span>WIND</button>
+    <button class="nav-item" data-view="data"><span>▤</span>DATA</button>
   </nav>
+  <div id="screenLockOverlay" class="screen-lock-overlay" aria-hidden="true">
+    <div class="lock-card"><div class="lock-symbol">⌑</div><h2>Screen locked</h2><p>Tap this screen 3 times to unlock.</p><p class="muted small">Keep the phone mounted securely. This lock only prevents accidental app touches; it is not a device-level security lock.</p><div id="tapProgress">0 / 3 taps</div><button id="unlockButton" class="secondary">Unlock now</button></div>
+  </div>
   <div id="toast" role="status" class="toast" aria-live="polite"></div>
   <script src="./app.js"></script>
 </body>
