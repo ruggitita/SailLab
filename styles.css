@@ -57,3 +57,31 @@ button{min-height:38px;padding:9px 11px;border-radius:10px} .button-row{gap:7px}
 
 /* Start line layout: pin on the left, committee boat on the right. */
 .line-grid .pin{order:-1}
+
+/* SailLab cockpit editor and presentation mode */
+.dashboard-grid [data-widget].widget-full{grid-column:1/-1}
+.dashboard-grid [data-widget].widget-hidden{display:none!important}
+.dashboard-grid [data-widget].widget-font-small{font-size:12px}.dashboard-grid [data-widget].widget-font-medium{font-size:15px}.dashboard-grid [data-widget].widget-font-large{font-size:18px}.dashboard-grid [data-widget].widget-font-xlarge{font-size:22px}
+.dashboard-grid [data-widget].widget-font-small strong{font-size:24px}.dashboard-grid [data-widget].widget-font-medium strong{font-size:30px}.dashboard-grid [data-widget].widget-font-large strong{font-size:36px}.dashboard-grid [data-widget].widget-font-xlarge strong{font-size:42px}
+body.editing-cockpit #dashboardGrid [data-dash-widget]{cursor:grab;outline:1px dashed color-mix(in srgb,var(--accent) 55%,transparent)}
+body.cockpit-presentation #dashboardGrid .dash-head strong,body.cockpit-presentation #dashboardGrid .dash-tag,body.cockpit-presentation #dashboardGrid .dash-sub,body.cockpit-presentation #dashboardGrid .muted.small,body.cockpit-presentation #dashboardGrid .metric-label,body.cockpit-presentation #dashboardGrid .metric-foot,body.cockpit-presentation #dashboardGrid .dash-trim label,body.cockpit-presentation #dashboardGrid .dash-trim button,body.cockpit-presentation #dashboardGrid .dash-widget .button-row,body.cockpit-presentation #dashboardGrid .dash-widget p{display:none!important}
+body.cockpit-presentation #dashboardGrid .dash-big{font-size:clamp(58px,17vw,108px);line-height:1.02;justify-content:center}
+body.cockpit-presentation #dashboardGrid .hero-value{font-size:clamp(82px,24vw,150px);text-align:center}
+body.cockpit-presentation #dashboardGrid .dash-widget{min-height:120px;display:flex;flex-direction:column;justify-content:center}
+body.cockpit-presentation #dashboardGrid .dash-map,body.cockpit-presentation #dashboardGrid .dash-chart,body.cockpit-presentation #dashboardGrid .dash-trim{display:none!important}
+.analysis-stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.analysis-stat{padding:12px;border:1px solid var(--line);background:var(--panel2);border-radius:12px;min-width:0}
+.analysis-stat strong{display:block;margin-top:8px;font-size:20px;overflow-wrap:anywhere}
+#maneuverRows td{font-variant-numeric:tabular-nums}
+@media(min-width:650px){.analysis-stats-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+body.cockpit-presentation #dashboardGrid .metric strong{font-size:clamp(54px,15vw,100px);line-height:1.02;text-align:center}
+body.cockpit-presentation #dashboardGrid .position{display:none!important}
+
+.dashboard-grid .dash-map:not(.dash-wide),.dashboard-grid .dash-chart:not(.dash-wide){grid-column:auto}
+
+body.cockpit-presentation #dashboardGrid .dash-head,body.cockpit-presentation #dashboardGrid .wind-data span,body.cockpit-presentation #dashboardGrid .wind-led-panel,body.cockpit-presentation #dashboardGrid .wind-shift-number small{display:none!important}
+body.cockpit-presentation #dashboardGrid .wind-data strong,body.cockpit-presentation #dashboardGrid .wind-shift-number span{font-size:clamp(42px,12vw,80px);line-height:1.02}
+
+/* Session dock-tune photo attachments */
+.dock-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:9px;margin-top:10px}.dock-photo{min-width:0;border:1px solid var(--line);background:var(--panel2);padding:6px;border-radius:10px}.dock-photo img{display:block;width:100%;height:84px;object-fit:cover;border-radius:7px}.dock-photo button{width:100%;margin-top:5px;min-height:30px;padding:5px;font-size:11px}

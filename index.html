@@ -1,209 +1,127 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#08131f">
-  <meta name="description" content="SailLab — sailing session recording and performance analysis, stored locally.">
-  <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <title>SailLab</title>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/>
+<meta content="#08131f" name="theme-color"/>
+<meta content="SailLab — sailing session recording and performance analysis, stored locally." name="description"/>
+<link href="./manifest.webmanifest" rel="manifest"/>
+<link href="./icons/icon.svg" rel="icon" type="image/svg+xml"/>
+<link href="./styles.css" rel="stylesheet"/>
+<link crossorigin="" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" rel="stylesheet"/>
+<title>SailLab</title>
 </head>
 <body>
-  <header class="topbar">
-    <div><div class="eyebrow">SAILLAB / PERFORMANCE</div><h1>SailLab</h1></div>
-    <div class="topbar-tools"><label class="theme-label" for="themeSelect">THEME</label><select id="themeSelect" class="theme-select" aria-label="Choose color theme"><option value="dark">Dark</option><option value="light">Light</option><option value="blue" selected>Ocean Blue</option><option value="purple">Electric Violet</option><option value="yellow">Solar Yellow</option></select><div id="gpsBadge" class="status"><span class="dot"></span> GPS inactive</div></div>
-  </header>
-
-  <main>
-    <section id="view-live" class="view active">
-      <div class="section-head"><div><p class="eyebrow">LIVE DATA</p><h2>Live</h2></div><div class="muted small" id="sampleRate">— Hz effective</div></div>
-      <div class="hero-metric panel widget-card" data-widget="sog" id="widget-sog">
-        <div class="metric-label">GPS SPEED <span>SOG</span></div>
-        <div class="hero-value"><span id="sog">—</span><small>kn</small></div>
-        <div class="metric-foot"><span>Average <b id="avgSpeed">—</b> kn</span><span>Maximum <b id="maxSpeed">—</b> kn</span></div>
-      </div>
-      <div class="metric-grid">
-        <div class="panel metric widget-card" data-widget="course" id="widget-course"><span class="metric-label">COG</span><strong id="course">—<small>°</small></strong><span class="muted small">Direction over ground</span></div>
-        <div class="panel metric widget-card" data-widget="accuracy" id="widget-accuracy"><span class="metric-label">GPS ACCURACY</span><strong id="accuracy">—<small> m</small></strong><span class="muted small">Reported accuracy</span></div>
-        <div class="panel metric widget-card" data-widget="heel" id="widget-heel"><span class="metric-label">HEEL</span><strong id="heel">—<small>°</small></strong><span class="muted small">Phone roll estimate</span></div>
-        <div class="panel metric widget-card" data-widget="pitch" id="widget-pitch"><span class="metric-label">PITCH</span><strong id="pitch">—<small>°</small></strong><span class="muted small">Phone pitch estimate</span></div>
-        <div class="panel metric widget-card" data-widget="duration" id="widget-duration"><span class="metric-label">DURATION</span><strong id="duration">00:00</strong><span class="muted small">Current session</span></div>
-        <div class="panel metric widget-card" data-widget="samples" id="widget-samples"><span class="metric-label">SAMPLES</span><strong id="samples">0</strong><span class="muted small">Recorded samples</span></div>
-      </div>
-      <div class="panel position"><div><span class="metric-label">GPS POSITION</span><strong id="coords">Waiting for GPS</strong></div><button class="secondary" id="refreshGps">Enable GPS</button></div>
-      <div class="notice" id="sensorNotice">Heel and pitch are read from phone motion/orientation sensors when available. The phone must be securely mounted and aligned with the boat; readings are phone orientation, not calibrated marine instruments. COG is course over ground, not bow heading.</div>
-      <div class="panel controls">
-        <h3>Sensor calibration & display</h3>
-        <div class="button-row"><button class="secondary" id="zeroHeelBtn">Set HEEL zero</button><button class="secondary" id="zeroPitchBtn">Set PITCH zero</button></div>
-        <p class="muted small" id="zeroStatus">Zero offsets: not calibrated.</p>
-        <div class="button-row"><button class="secondary" id="lockScreenBtn">Lock screen</button><button class="secondary" id="wakeLockBtn">Keep screen awake</button></div>
-        <p class="muted small">Screen lock blocks accidental touches. Unlock by tapping the lock screen 3 times. Hardware volume-button unlocking is not available in a standard web app.</p>
-        <h3>Customize LIVE widgets</h3>
-        <label>Widget<select id="widgetSelect"><option value="sog">SOG / GPS speed</option><option value="course">COG</option><option value="accuracy">GPS accuracy</option><option value="heel">HEEL</option><option value="pitch">PITCH</option><option value="duration">Duration</option><option value="samples">Samples</option></select></label>
-        <div class="form-grid">
-          <label>Widget width<select id="widgetWidth"><option value="half">Half width</option><option value="full">Full width</option></select></label>
-          <label>Font size<select id="widgetFont"><option value="small">Small</option><option value="medium" selected>Medium</option><option value="large">Large</option><option value="xlarge">Extra large</option></select></label>
-        </div>
-        <div class="form-grid">
-          <label>Background color<input id="widgetBg" type="color" value="#101f2e"></label>
-          <label>Text color<input id="widgetColor" type="color" value="#f1f6fa"></label>
-        </div>
-        <div class="button-row"><button class="secondary" id="widgetUp">Move up</button><button class="secondary" id="widgetDown">Move down</button></div>
-        <div class="button-row"><button class="secondary" id="widgetHide">Hide / show</button><button class="secondary" id="widgetReset">Reset layout</button></div>
-        <p class="muted small">Widget layout and colors are saved locally in this browser.</p>
-        <button class="secondary full" id="sensorBtn">Enable motion sensors</button><p class="muted small">Securely mount the phone and align its axes with the boat. Values may require calibration.</p>
-        <button class="primary" id="startBtn">▶ Start session</button>
-        <div class="button-row"><button class="secondary" id="pauseBtn" disabled>Ⅱ Pause</button><button class="secondary" id="resumeBtn" disabled>▶ Resume</button><button class="danger" id="stopBtn" disabled>■ Finish</button></div>
-      </div>
-    </section>
-
-    <section id="view-race" class="view">
-      <div class="section-head"><div><p class="eyebrow race-color">START LINE / RACE MODE</p><h2>Start line</h2></div><div class="live-pill">GPS based</div></div>
-      <div class="panel race-hero">
-        <div class="race-topline"><span>TIME TO GUN</span><span id="gunStatus">Countdown not running</span></div>
-        <div class="gun-value" id="gunCountdown">00:00</div>
-        <label>Countdown duration / time remaining (seconds)<input id="gunSeconds" type="number" min="0" step="1" value="300"></label>
-        <div class="button-row countdown-adjust"><button id="gunMinusMinute" class="secondary" type="button">− 1 min</button><button id="gunPlusMinute" class="secondary" type="button">+ 1 min</button></div>
-        <div class="button-row countdown-actions"><button id="gunStart" class="race-btn">Start countdown</button><button id="gunSync" class="secondary">Sync & start</button><button id="gunReset" class="secondary">Reset</button></div>
-        <p class="muted small">Use +/− 1 min to adjust the countdown, including while it is running. For synchronization, enter the official time remaining and tap Sync & start.</p>
-      </div>
-      <div class="line-grid">
-        <div class="panel line-card committee"><div class="line-card-head"><span class="line-icon">C</span><div><span class="metric-label">COMMITTEE BOAT</span><strong id="committeeStatus">Not pinged</strong></div></div><p class="small muted" id="committeeCoords">Set the current GPS position as committee end.</p><button class="line-btn" id="pingCommittee">Ping committee boat</button></div>
-        <div class="panel line-card pin"><div class="line-card-head"><span class="line-icon">P</span><div><span class="metric-label">PIN END</span><strong id="pinStatus">Not pinged</strong></div></div><p class="small muted" id="pinCoords">Set the current GPS position as pin end.</p><button class="line-btn" id="pingPin">Ping pin</button></div>
-      </div>
-      <div class="metric-grid race-metrics">
-        <div class="panel metric race-distance"><span class="metric-label">DISTANCE TO LINE</span><strong id="lineDistance">—<small> m</small></strong><span class="muted small">Perpendicular distance</span></div>
-        <div class="panel metric race-time"><span class="metric-label">TIME TO LINE</span><strong id="timeToLine">—</strong><span class="muted small">At current SOG</span></div>
-        <div class="panel metric race-burn"><span class="metric-label">TIME TO KILL</span><strong id="timeToBurn">—</strong><span class="muted small" id="burnHint">Gun time minus estimated arrival</span></div>
-        <div class="panel metric race-length"><span class="metric-label">LINE LENGTH</span><strong id="lineLength">—<small> nm</small></strong><span class="muted small">Committee to pin</span></div>
-      </div>
-      <div class="panel map-panel"><div class="panel-heading"><div><h3>Race map</h3><p class="muted small">Your position and both line endpoints</p></div><button class="secondary compact" id="centerRaceMap">Center</button></div><div id="raceMap" class="map"></div><p class="muted small map-note">Map tiles require an internet connection. GPS access requires HTTPS and location permission.</p></div>
-      <div class="notice">The line distance is the perpendicular distance from your current GPS position to the line segment. Time-to-line assumes you keep your current speed and head directly toward it; it does not account for approach angle, current, manoeuvres or acceleration. Use as a tactical estimate, not as a safety-critical instrument.</div>
-    </section>
-
-    <section id="view-cockpit" class="view">
-      <div class="section-head"><div><p class="eyebrow cockpit-color">YOUR BOAT / LIVE COCKPIT</p><h2>Cockpit</h2></div><button class="secondary compact" id="editDashboard">Edit widgets</button></div>
-      <div class="panel dashboard-editor" id="dashboardEditor" hidden><h3>Choose the data you want to see</h3><p class="muted small">Toggle widgets and drag cards to reorder them. Your layout is saved on this device.</p><div id="dashboardToggles" class="toggle-grid"></div><button class="secondary full" id="dashboardReset">Reset cockpit layout</button></div>
-      <div id="dashboardGrid" class="dashboard-grid">
-        <article class="panel dash-widget dash-map" data-dash-widget="map" draggable="true"><div class="dash-head"><span class="dash-tag map-tag">MAP</span><strong>Boat & start line</strong></div><div id="dashboardMap" class="map mini-map"></div><p class="muted small">Tap Start line to ping the endpoints.</p></article>
-        <article class="panel dash-widget dash-sog" data-dash-widget="sog" draggable="true"><div class="dash-head"><span class="dash-tag speed-tag">SPEED</span><strong>Speed over ground</strong></div><div class="dash-big"><span id="dashSog">—</span><small>kn</small></div><div class="dash-sub">COG <b id="dashCog">—</b></div></article>
-        <article class="panel dash-widget dash-heel" data-dash-widget="heel" draggable="true"><div class="dash-head"><span class="dash-tag heel-tag">HEEL</span><strong>Heel angle</strong></div><div class="dash-big"><span id="dashHeel">—</span><small>°</small></div><div class="dash-sub">Session average <b id="dashHeelAvg">—</b></div></article>
-        <article class="panel dash-widget dash-pitch" data-dash-widget="pitch" draggable="true"><div class="dash-head"><span class="dash-tag pitch-tag">PITCH</span><strong>Pitch angle</strong></div><div class="dash-big"><span id="dashPitch">—</span><small>°</small></div><div class="dash-sub">Phone orientation estimate</div></article>
-        <article class="panel dash-widget dash-trim" data-dash-widget="trim" draggable="true"><div class="dash-head"><span class="dash-tag trim-tag">TRIM</span><strong>Manual trim log</strong></div><div class="dash-big"><span id="trimAverage">—</span><small>avg</small></div><label>Trim value / score<input id="trimValue" type="number" step="0.1" placeholder="e.g. 2.5"></label><button class="trim-btn" id="logTrim">Log trim value</button><p class="muted small" id="trimCount">No trim readings yet</p></article>
-        <article class="panel dash-widget dash-wind dash-wide" data-dash-widget="wind" draggable="true"><div class="dash-head"><span class="dash-tag wind-tag">WIND SHIFT</span><strong>Heading & estimated true wind</strong></div><div class="wind-data-row"><div class="wind-data"><span>HEADING / GPS COG</span><strong id="dashWindHeading">—°</strong></div><div class="wind-data"><span>EST. TRUE WIND DIR.</span><strong id="dashTrueWindDirection">—°</strong></div><div class="wind-shift-number"><span id="dashWindShift">—</span><small id="dashWindLabel">SHIFT</small></div></div><div class="wind-led-panel"><div class="wind-led-labels"><span class="led-left-label">← LEFT SHIFT</span><span>NEUTRAL</span><span class="led-right-label">RIGHT SHIFT →</span></div><div class="wind-shift-leds" id="windShiftLeds" aria-label="Wind shift LED indicator"></div></div><div class="button-row wind-cockpit-actions"><button id="cockpitPortTack" class="port-btn">↶ Start PORT tack</button><button id="cockpitStarboardTack" class="starboard-btn">↷ Start STARBOARD tack</button></div><div class="dash-sub">Port legs <b id="cockpitPortCount">0</b> · Starboard legs <b id="cockpitStarboardCount">0</b></div><p class="muted small">Wind direction is estimated from average GPS courses on both tacks. COG is not a compass heading.</p></article>
-        <article class="panel dash-widget dash-line" data-dash-widget="line" draggable="true"><div class="dash-head"><span class="dash-tag line-tag">START</span><strong>Time to Kill</strong></div><div class="dash-big"><span id="dashBurn">—</span></div><div class="dash-sub">Time to line <b id="dashTimeToLine">—</b></div><button class="line-btn" id="dashboardRaceBtn">Open start line</button></article>
-        <article class="panel dash-widget dash-chart" data-dash-widget="chart" draggable="true"><div class="dash-head"><span class="dash-tag chart-tag">TREND</span><strong>Heel & trim trend</strong></div><canvas id="heelTrimChart" height="150" aria-label="Heel and trim trend chart"></canvas><p class="muted small">Heel from phone sensors; trim values entered manually.</p></article>
-      </div>
-    </section>
-
-    <section id="view-session" class="view">
-      <div class="section-head"><div><p class="eyebrow">SESSION RECORDING</p><h2>Session</h2></div></div>
-      <div class="panel form-panel">
-        <h3>Session details</h3>
-        <label>Session name<input id="sessionName" placeholder="Morning training" value="Sailing session"></label>
-        <div class="form-grid"><label>Boat / model<input id="boat" placeholder="e.g. 49er"></label><label>Crew name<input id="crew" placeholder="Crew name(s)"></label></div>
-        <label>Location<input id="location" placeholder="Harbour / sailing area"></label>
-        <div class="form-grid"><label>Opponents<input id="opponents" placeholder="Boats / teams to compare with"></label><label>Onboard feeling<input id="onboardFeeling" placeholder="How did the boat feel?"></label></div>
-      </div>
-      <div class="panel form-panel">
-        <h3>Weather & racecourse</h3>
-        <div class="form-grid"><label>Estimated wind (kn)<input id="wind" type="number" min="0" step="0.5" placeholder="knots"></label><label>Estimated waves (m)<input id="waves" type="number" min="0" step="0.1" placeholder="Wave height"></label></div>
-        <div class="form-grid"><label>Wind direction (°)<input id="windDirectionInput" type="number" min="0" max="359" step="1" placeholder="0–359°"></label><label>Current direction (°)<input id="currentDirection" type="number" min="0" max="359" step="1" placeholder="0–359°"></label></div>
-        <div class="form-grid"><label>Wind gustiness (1–5)<select id="gustiness"><option value="">Not rated</option><option value="1">1 — Very steady</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5 — Very gusty</option></select></label><label>Wave state (1–5)<select id="waveState"><option value="">Not rated</option><option value="1">1 — Flat</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5 — Very rough</option></select></label></div>
-        <label>Racecourse notes<textarea id="weatherNotes" rows="3" placeholder="What did you think of the racecourse, shifts, pressure, current, etc.?"></textarea></label>
-      </div>
-      <div class="panel form-panel">
-        <h3>Materials used</h3>
-        <div class="form-grid"><label>Sail / sail model<input id="sailModel" placeholder="Sail brand / model"></label><label>Mast<input id="mast" placeholder="Mast model / stiffness"></label></div>
-        <div class="form-grid"><label>Platform<input id="platform" placeholder="Hull / platform"></label><label>Foil<input id="foil" placeholder="Foil model"></label></div>
-        <label>Rudder<input id="rudder" placeholder="Rudder model"></label>
-        <h4>Sails</h4>
-        <label>Mainsail<input id="mainsail" placeholder="Mainsail model / size"></label>
-        <label>Jib<input id="jib" placeholder="Jib model / size"></label>
-        <label>Gennaker<input id="gennaker" placeholder="Gennaker model / size"></label>
-        <label>Materials notes<textarea id="materialNotes" rows="3" placeholder="Condition, wear, changes, impressions..."></textarea></label>
-      </div>
-      <div class="panel form-panel">
-        <h3>Dock tune</h3>
-        <p class="muted small">Record the setup values used before leaving the dock.</p>
-        <div class="form-grid"><label>Shrouds<input id="shrouds" placeholder="Value / setting"></label><label>Forestay<input id="forestay" placeholder="Value / setting"></label></div>
-        <div class="form-grid"><label>Prebend<input id="prebend" placeholder="Value / setting"></label><label>Spreader position<input id="spreaderPosition" placeholder="Value / setting"></label></div>
-        <div class="form-grid"><label>Diamond / diamante<input id="diamond" placeholder="Value / setting"></label><label>Rake<input id="rake" placeholder="Value / setting"></label></div>
-        <div class="form-grid"><label>D1<input id="d1" placeholder="Value / setting"></label><label>D2<input id="d2" placeholder="Value / setting"></label></div>
-        <div class="form-grid"><label>V1<input id="v1" placeholder="Value / setting"></label><label>V2<input id="v2" placeholder="Value / setting"></label></div>
-        <label>Dock tune notes<textarea id="dockTuneNotes" rows="2" placeholder="Extra tuning details..."></textarea></label>
-        <p class="muted small">Session details and setup are stored locally in this browser on this device. Nothing is sent to a server.</p>
-      </div>
-      <div class="panel controls">
-        <h3>Log an event</h3>
-        <div class="event-grid">
-          <button class="event-btn" data-event="Tack">↶ Tack</button><button class="event-btn" data-event="Gybe">↷ Gybe</button>
-          <button class="event-btn" data-event="Start">⚑ Start</button><button class="event-btn" data-event="Tuning change">⚙ Tuning change</button>
-          <button class="event-btn" data-event="Wind shift">↗ Wind shift</button><button class="event-btn" data-event="Start leg">⇢ Start leg</button>
-        </div>
-        <label>Custom event<input id="customEvent" placeholder="Event name"></label><button id="customEventBtn" class="secondary full">+ Log custom event</button>
-        <label>Quick note<textarea id="quickNote" rows="2" placeholder="Add a note..."></textarea></label><button id="noteBtn" class="secondary full">+ Save note with position</button>
-      </div>
-    </section>
-
-    <section id="view-analysis" class="view">
-      <div class="section-head"><div><p class="eyebrow">RECORDED DATA</p><h2>Analysis</h2></div></div>
-      <div id="analysisEmpty" class="panel empty">Start or import a session to see statistics.</div>
-      <div id="analysisContent" hidden>
-        <div class="metric-grid">
-          <div class="panel metric"><span class="metric-label">VALID SAMPLES</span><strong id="aCount">0</strong></div>
-          <div class="panel metric"><span class="metric-label">DISTANCE</span><strong id="distance">—<small> nm</small></strong></div>
-          <div class="panel metric"><span class="metric-label">AVERAGE SPEED</span><strong id="aMean">—<small> kn</small></strong></div>
-          <div class="panel metric"><span class="metric-label">STD. DEVIATION</span><strong id="aStd">—<small> kn</small></strong></div>
-        </div>
-        <div class="panel"><h3>Speed over time</h3><canvas id="speedChart" height="180" aria-label="GPS speed chart"></canvas><p class="muted small">Chart based on real samples from the selected session.</p></div>
-        <div class="panel"><h3>Recent samples</h3><div class="table-wrap"><table><thead><tr><th>Time</th><th>SOG (kn)</th><th>COG</th><th>Accuracy (m)</th></tr></thead><tbody id="sampleRows"></tbody></table></div></div>
-      </div>
-    </section>
-
-    <section id="view-wind" class="view">
-      <div class="section-head"><div><p class="eyebrow wind-color">UPWIND TACTICS</p><h2>Wind shifts</h2></div><div class="live-pill wind-pill">Port / Starboard</div></div>
-      <div class="panel wind-hero"><span class="metric-label">ESTIMATED WIND DIRECTION</span><div class="wind-big"><span id="windDirection">—</span><small>°</small></div><p class="muted small">Estimated as the angular bisector of average GPS courses recorded on each upwind tack.</p></div>
-      <div class="shift-visual" id="shiftVisual"><div class="shift-side left-shift"><span>LEFT SHIFT</span><strong id="leftShift">—</strong><small>counter-clockwise</small></div><div class="shift-center"><div class="compass-ring"><span>N</span><span>E</span><span>S</span><span>W</span><div class="compass-needle" id="windNeedle"></div></div><span class="small muted" id="windBaselineLabel">Baseline not set</span></div><div class="shift-side right-shift"><span>RIGHT SHIFT</span><strong id="rightShift">—</strong><small>clockwise</small></div></div>
-      <div class="panel controls"><h3>Record an upwind leg</h3><p class="muted small">Tap the relevant tack when you settle onto that tack, sail a reasonably steady upwind leg, then tap the other tack after the tack. Each completed leg is averaged from its GPS course samples.</p><div class="button-row"><button id="portTack" class="port-btn">↶ Start PORT tack</button><button id="starboardTack" class="starboard-btn">↷ Start STARBOARD tack</button></div><div class="metric-grid top-space"><div class="panel inset"><span class="metric-label">PORT LEGS</span><strong id="portCount">0</strong><span class="muted small" id="portMean">Average course —</span></div><div class="panel inset"><span class="metric-label">STARBOARD LEGS</span><strong id="starboardCount">0</strong><span class="muted small" id="starboardMean">Average course —</span></div></div><div class="button-row"><button id="setWindBaseline" class="secondary">Set current direction as baseline</button><button id="resetWindData" class="secondary">Clear wind data</button></div><p id="windResult" class="notice">Start a session, enable GPS, then mark a steady upwind leg on each tack.</p></div>
-      <div class="panel"><h3>How to read the shifts</h3><p class="muted small">The current direction is estimated from the bisector between the average courses of port and starboard upwind legs. A clockwise change is shown as a right shift; a counter-clockwise change as a left shift. GPS course over ground is affected by current, leeway, waves and poor GPS fixes, so use steady legs and compare repeated samples. This is an estimate, not a replacement for a wind sensor.</p></div>
-    </section>
-
-    <section id="view-data" class="view">
-      <div class="section-head"><div><p class="eyebrow">LOCAL ARCHIVE</p><h2>Data</h2></div></div>
-      <div class="panel">
-        <h3>Saved sessions</h3><div id="sessionsList" class="sessions-list"><p class="muted">No saved sessions.</p></div>
-      </div>
-      <div class="panel">
-        <h3>Export and import</h3>
-        <p class="muted small">Export the current session or a session from history. GPX import preserves timestamps, coordinates and altitude when present; missing values are not fabricated.</p>
-        <div class="button-row"><button id="exportJson" class="secondary">Export JSON</button><button id="exportCsv" class="secondary">Export CSV</button></div>
-        <label class="file-label">Import GPX track<input type="file" id="gpxInput" accept=".gpx,application/gpx+xml"></label>
-        <div id="importMessage" class="muted small"></div>
-      </div>
-      <div class="panel">
-        <h3>Full backup</h3><button id="backupBtn" class="primary full">Download all sessions (JSON)</button>
-        <p class="muted small">Keep regular backups: clearing browser data may delete sessions.</p>
-      </div>
-    </section>
-  </main>
-
-  <nav class="bottom-nav" aria-label="Main navigation">
-    <button class="nav-item active" data-view="live"><span>◉</span>LIVE</button>
-    <button class="nav-item" data-view="race"><span>⚑</span>START</button>
-    <button class="nav-item" data-view="cockpit"><span>▦</span>COCKPIT</button>
-    <button class="nav-item" data-view="session"><span>⏱</span>SESSION</button>
-    <button class="nav-item" data-view="analysis"><span>⌁</span>ANALYSIS</button>
-    <button class="nav-item" data-view="data"><span>▤</span>DATA</button>
-  </nav>
-  <div id="screenLockOverlay" class="screen-lock-overlay" aria-hidden="true">
-    <div class="lock-card"><div class="lock-symbol">⌑</div><h2>Screen locked</h2><p>Tap this screen 3 times to unlock.</p><p class="muted small">Keep the phone mounted securely. This lock only prevents accidental app touches; it is not a device-level security lock.</p><div id="tapProgress">HOLD TO UNLOCK</div><button id="unlockButton" class="secondary">Unlock now</button></div>
-  </div>
-  <div id="toast" role="status" class="toast" aria-live="polite"></div>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="./app.js"></script>
+<header class="topbar">
+<div><div class="eyebrow">SAILLAB / PERFORMANCE</div><h1>SailLab</h1></div>
+<div class="topbar-tools"><div class="status" id="gpsBadge"><span class="dot"></span> GPS inactive</div></div>
+</header>
+<main>
+<section class="view" id="view-race">
+<div class="section-head"><div><p class="eyebrow race-color">START LINE / RACE MODE</p><h2>Start line</h2></div><div class="live-pill">GPS based</div></div>
+<div class="panel race-hero">
+<div class="race-topline"><span>TIME TO GUN</span><span id="gunStatus">Countdown not running</span></div>
+<div class="gun-value" id="gunCountdown">00:00</div>
+<label>Countdown duration / time remaining (seconds)<input id="gunSeconds" min="0" step="1" type="number" value="300"/></label>
+<div class="button-row countdown-adjust"><button class="secondary" id="gunMinusMinute" type="button">− 1 min</button><button class="secondary" id="gunPlusMinute" type="button">+ 1 min</button></div>
+<div class="button-row countdown-actions"><button class="race-btn" id="gunStart">Start countdown</button><button class="secondary" id="gunSync">Sync &amp; start</button><button class="secondary" id="gunReset">Reset</button></div>
+<p class="muted small">Use +/− 1 min to adjust the countdown, including while it is running. For synchronization, enter the official time remaining and tap Sync &amp; start.</p>
+</div>
+<div class="line-grid">
+<div class="panel line-card committee"><div class="line-card-head"><span class="line-icon">C</span><div><span class="metric-label">COMMITTEE BOAT</span><strong id="committeeStatus">Not pinged</strong></div></div><p class="small muted" id="committeeCoords">Set the current GPS position as committee end.</p><button class="line-btn" id="pingCommittee">Ping committee boat</button></div>
+<div class="panel line-card pin"><div class="line-card-head"><span class="line-icon">P</span><div><span class="metric-label">PIN END</span><strong id="pinStatus">Not pinged</strong></div></div><p class="small muted" id="pinCoords">Set the current GPS position as pin end.</p><button class="line-btn" id="pingPin">Ping pin</button></div>
+</div>
+<div class="metric-grid race-metrics">
+<div class="panel metric race-distance"><span class="metric-label">DISTANCE TO LINE</span><strong id="lineDistance">—<small> m</small></strong><span class="muted small">Perpendicular distance</span></div>
+<div class="panel metric race-time"><span class="metric-label">TIME TO LINE</span><strong id="timeToLine">—</strong><span class="muted small">At current SOG</span></div>
+<div class="panel metric race-burn"><span class="metric-label">TIME TO KILL</span><strong id="timeToBurn">—</strong><span class="muted small" id="burnHint">Gun time minus estimated arrival</span></div>
+<div class="panel metric race-length"><span class="metric-label">LINE LENGTH</span><strong id="lineLength">—<small> nm</small></strong><span class="muted small">Committee to pin</span></div>
+</div>
+<div class="panel map-panel"><div class="panel-heading"><div><h3>Race map</h3><p class="muted small">Your position and both line endpoints</p></div><button class="secondary compact" id="centerRaceMap">Center</button></div><div class="map" id="raceMap"></div><p class="muted small map-note">Map tiles require an internet connection. GPS access requires HTTPS and location permission.</p></div>
+<div class="notice">The line distance is the perpendicular distance from your current GPS position to the line segment. Time-to-line assumes you keep your current speed and head directly toward it; it does not account for approach angle, current, manoeuvres or acceleration. Use as a tactical estimate, not as a safety-critical instrument.</div>
+</section>
+<section class="view active" id="view-cockpit">
+<div class="section-head"><div><p class="eyebrow cockpit-color">YOUR BOAT / LIVE DASHBOARD</p><h2>Dashboard</h2></div><button class="secondary compact" id="editDashboard">Edit dashboard</button></div>
+<div class="panel dashboard-editor" hidden="" id="dashboardEditor"><h3>Choose the data you want to see</h3><p class="muted small">Enter edit mode to drag and reorder widgets. Use Settings for size, font and color customization.</p><div class="toggle-grid" id="dashboardToggles"></div><button class="secondary full" id="dashboardReset">Reset dashboard layout</button></div>
+<div class="dashboard-grid" id="dashboardGrid"><div class="panel dash-widget dash-sog widget-card" data-cockpit-widget="live-sog" data-dash-widget="live-sog" data-widget="live-sog" draggable="true" id="widget-sog">
+<div class="metric-label">GPS SPEED / SOG</div>
+<div class="hero-value"><span id="sog">—</span><small>kn</small></div>
+<div class="metric-foot"><span>Average <b id="avgSpeed">—</b> kn</span><span>Maximum <b id="maxSpeed">—</b> kn</span></div>
+</div><div class="panel position dash-widget" data-dash-widget="live-position" data-widget="live-position" draggable="true"><div><span class="metric-label">GPS POSITION</span><strong id="coords">Waiting for GPS</strong></div><button class="secondary" id="refreshGps">Enable GPS</button></div>
+<article class="panel dash-widget dash-map" data-cockpit-widget="map" data-dash-widget="map" data-widget="map" draggable="true"><div class="dash-head"><span class="dash-tag map-tag">MAP</span><strong>Boat &amp; start line</strong></div><div class="map mini-map" id="dashboardMap"></div><p class="muted small">Tap Start line to ping the endpoints.</p></article>
+<article class="panel dash-widget dash-trim" data-cockpit-widget="trim" data-dash-widget="trim" data-widget="trim" draggable="true"><div class="dash-head"><span class="dash-tag trim-tag">TRIM</span><strong>Manual trim log</strong></div><div class="dash-big"><span id="trimAverage">—</span><small>avg</small></div><label>Trim value / score<input id="trimValue" placeholder="e.g. 2.5" step="0.1" type="number"/></label><button class="trim-btn" id="logTrim">Log trim value</button><p class="muted small" id="trimCount">No trim readings yet</p></article>
+<article class="panel dash-widget dash-wind dash-wide" data-cockpit-widget="wind" data-dash-widget="wind" data-widget="wind" draggable="true"><div class="dash-head"><span class="dash-tag wind-tag">WIND SHIFT</span><strong>Heading &amp; estimated true wind</strong></div><div class="wind-data-row"><div class="wind-data"><span>HEADING / GPS COG</span><strong id="dashWindHeading">—°</strong></div><div class="wind-data"><span>EST. TRUE WIND DIR.</span><strong id="dashTrueWindDirection">—°</strong></div><div class="wind-shift-number"><span id="dashWindShift">—</span><small id="dashWindLabel">SHIFT</small></div></div><div class="wind-led-panel"><div class="wind-led-labels"><span class="led-left-label">← LEFT SHIFT</span><span>NEUTRAL</span><span class="led-right-label">RIGHT SHIFT →</span></div><div aria-label="Wind shift LED indicator" class="wind-shift-leds" id="windShiftLeds"></div></div><div class="button-row wind-cockpit-actions"><button class="port-btn" id="cockpitPortTack">↶ Start PORT tack</button><button class="starboard-btn" id="cockpitStarboardTack">↷ Start STARBOARD tack</button></div><div class="dash-sub">Port legs <b id="cockpitPortCount">0</b> · Starboard legs <b id="cockpitStarboardCount">0</b></div><p class="muted small">Wind direction is estimated from average GPS courses on both tacks. COG is not a compass heading.</p></article>
+<article class="panel dash-widget dash-line" data-cockpit-widget="line" data-dash-widget="line" data-widget="line" draggable="true"><div class="dash-head"><span class="dash-tag line-tag">START</span><strong>Time to Kill</strong></div><div class="dash-big"><span id="dashBurn">—</span></div><div class="dash-sub">Time to line <b id="dashTimeToLine">—</b></div><button class="line-btn" id="dashboardRaceBtn">Open start line</button></article>
+<article class="panel dash-widget dash-chart" data-cockpit-widget="chart" data-dash-widget="chart" data-widget="chart" draggable="true"><div class="dash-head"><span class="dash-tag chart-tag">TREND</span><strong>Heel &amp; trim trend</strong></div><canvas aria-label="Heel and trim trend chart" height="150" id="heelTrimChart"></canvas><p class="muted small">Heel from phone sensors; trim values entered manually.</p></article>
+<div class="panel dash-widget metric widget-card" data-cockpit-widget="live-course" data-dash-widget="live-course" data-widget="live-course" draggable="true" id="widget-course"><span class="metric-label">COG</span><strong id="course">—<small>°</small></strong><span class="muted small">Direction over ground</span></div><div class="panel dash-widget metric widget-card" data-cockpit-widget="live-accuracy" data-dash-widget="live-accuracy" data-widget="live-accuracy" draggable="true" id="widget-accuracy"><span class="metric-label">GPS ACCURACY</span><strong id="accuracy">—<small> m</small></strong><span class="muted small">Reported accuracy</span></div><div class="panel dash-widget metric widget-card" data-cockpit-widget="live-heel" data-dash-widget="live-heel" data-widget="live-heel" draggable="true" id="widget-heel"><span class="metric-label">HEEL</span><strong id="heel">—<small>°</small></strong><span class="muted small">Phone roll estimate</span></div><div class="panel dash-widget metric widget-card" data-cockpit-widget="live-pitch" data-dash-widget="live-pitch" data-widget="live-pitch" draggable="true" id="widget-pitch"><span class="metric-label">PITCH</span><strong id="pitch">—<small>°</small></strong><span class="muted small">Phone pitch estimate</span></div><div class="panel dash-widget metric widget-card" data-cockpit-widget="live-duration" data-dash-widget="live-duration" data-widget="live-duration" draggable="true" id="widget-duration"><span class="metric-label">DURATION</span><strong id="duration">00:00</strong><span class="muted small">Current session</span></div><div class="panel dash-widget metric widget-card" data-cockpit-widget="live-samples" data-dash-widget="live-samples" data-widget="live-samples" draggable="true" id="widget-samples"><span class="metric-label">SAMPLES</span><strong id="samples">0</strong><span class="muted small">Recorded samples</span></div></div>
+</section>
+<section class="view" id="view-session">
+<div class="section-head"><div><p class="eyebrow">SESSION RECORDING</p><h2>Session</h2></div></div>
+<div class="panel form-panel">
+<h3>Session details</h3>
+<label>Session name<input id="sessionName" placeholder="Morning training" value="Sailing session"/></label>
+<div class="form-grid"><label>Boat / model<input id="boat" placeholder="e.g. 49er"/></label><label>Crew name<input id="crew" placeholder="Crew name(s)"/></label></div>
+<label>Location<input id="location" placeholder="Harbour / sailing area"/></label>
+<div class="form-grid"><label>Opponents<input id="opponents" placeholder="Boats / teams to compare with"/></label><label>Onboard feeling<input id="onboardFeeling" placeholder="How did the boat feel?"/></label></div>
+</div>
+<div class="panel form-panel">
+<h3>Weather &amp; racecourse</h3>
+<div class="form-grid"><label>Estimated wind (kn)<input id="wind" min="0" placeholder="knots" step="0.5" type="number"/></label><label>Estimated waves (m)<input id="waves" min="0" placeholder="Wave height" step="0.1" type="number"/></label></div>
+<div class="form-grid"><label>Wind direction (°)<input id="windDirectionInput" max="359" min="0" placeholder="0–359°" step="1" type="number"/></label><label>Current direction (°)<input id="currentDirection" max="359" min="0" placeholder="0–359°" step="1" type="number"/></label></div>
+<div class="form-grid"><label>Wind gustiness (1–5)<select id="gustiness"><option value="">Not rated</option><option value="1">1 — Very steady</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5 — Very gusty</option></select></label><label>Wave state (1–5)<select id="waveState"><option value="">Not rated</option><option value="1">1 — Flat</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5 — Very rough</option></select></label></div>
+<label>Racecourse notes<textarea id="weatherNotes" placeholder="What did you think of the racecourse, shifts, pressure, current, etc.?" rows="3"></textarea></label>
+</div>
+<div class="panel form-panel">
+<h3>Materials used</h3>
+<div class="form-grid"><label>Sail / sail model<input id="sailModel" placeholder="Sail brand / model"/></label><label>Mast<input id="mast" placeholder="Mast model / stiffness"/></label></div>
+<div class="form-grid"><label>Platform<input id="platform" placeholder="Hull / platform"/></label><label>Foil<input id="foil" placeholder="Foil model"/></label></div>
+<div class="form-grid"><label>Foil settings<input id="foilSettings" placeholder="Rake, cant, alignment…"/></label><label>Rudder<input id="rudder" placeholder="Rudder model"/></label></div>
+<label>Rudder settings<input id="rudderSettings" placeholder="Rudder rake, angle, alignment…"/></label>
+<h4>Sails</h4>
+<label>Mainsail<input id="mainsail" placeholder="Mainsail model / size"/></label>
+<label>Jib<input id="jib" placeholder="Jib model / size"/></label>
+<label>Gennaker<input id="gennaker" placeholder="Gennaker model / size"/></label>
+<label>Materials notes<textarea id="materialNotes" placeholder="Condition, wear, changes, impressions..." rows="3"></textarea></label>
+</div>
+<div class="panel form-panel">
+<h3>Dock tune</h3>
+<p class="muted small">Record the setup values used before leaving the dock.</p>
+<div class="form-grid"><label>Shrouds<input id="shrouds" placeholder="Value / setting"/></label><label>Forestay<input id="forestay" placeholder="Value / setting"/></label></div>
+<div class="form-grid"><label>Prebend<input id="prebend" placeholder="Value / setting"/></label><label>Spreader position<input id="spreaderPosition" placeholder="Value / setting"/></label></div>
+<div class="form-grid"><label>Diamond / diamante<input id="diamond" placeholder="Value / setting"/></label><label>Rake<input id="rake" placeholder="Value / setting"/></label></div>
+<div class="form-grid"><label>D1<input id="d1" placeholder="Value / setting"/></label><label>D2<input id="d2" placeholder="Value / setting"/></label></div>
+<div class="form-grid"><label>V1<input id="v1" placeholder="Value / setting"/></label><label>V2<input id="v2" placeholder="Value / setting"/></label></div>
+<label>Dock tune notes<textarea id="dockTuneNotes" placeholder="Extra tuning details..." rows="2"></textarea></label><label>Dock tune photos<input id="dockTunePhotosInput" accept="image/*" capture="environment" multiple type="file"/><span class="muted small">Add photos of the rig, mast, shrouds or measurements. Images are stored with this session on this device.</span></label><div class="dock-photo-grid" id="dockTunePhotosPreview" aria-live="polite"></div>
+<p class="muted small">Session details and setup are stored locally in this browser on this device. Nothing is sent to a server.</p>
+</div>
+<div class="panel controls"><h3>Recording controls</h3><button class="primary full" id="startBtn">▶ Start session</button><div class="button-row"><button class="secondary" disabled="" id="pauseBtn">Ⅱ Pause</button><button class="secondary" disabled="" id="resumeBtn">▶ Resume</button><button class="danger" disabled="" id="stopBtn">■ Finish</button></div></div></section>
+<section class="view" id="view-analysis"><div class="section-head"><div><p class="eyebrow">PERFORMANCE DEBRIEF</p><h2>Analysis</h2></div></div><div class="panel empty" id="analysisEmpty">Start or import a session with GPS samples to analyse speed, sailing consistency and detected maneuvers.</div><div hidden="True" id="analysisContent"><div class="metric-grid"><div class="panel metric"><span class="metric-label">GPS SAMPLES</span><strong id="aCount">0</strong></div><div class="panel metric"><span class="metric-label">DISTANCE</span><strong id="distance">—</strong></div><div class="panel metric"><span class="metric-label">AVERAGE SOG</span><strong id="aMean">—</strong></div><div class="panel metric"><span class="metric-label">SPEED CHANGE STABILITY</span><strong id="aStd">—</strong></div></div><div class="panel"><h3>Speed over time</h3><canvas aria-label="GPS speed chart" height="180" id="speedChart"></canvas><p class="muted small">Recorded GPS speed; results depend on sampling rate and GPS quality.</p></div><div class="panel"><h3>1. Straight-line analysis</h3><p class="muted small">Stable-course segments are inferred from GPS samples. Compare speed, progress, sailing angle and consistency. Wind-based metrics require a wind direction in Session details.</p><label>Performance filter<select id="maneuverFilter"><option value="all">All segments / maneuvers</option><option value="top50">Top 50% by VMG</option><option value="top20">Top 20% by VMG</option></select></label><div class="table-wrap"><table><thead><tr><th>#</th><th>Mode</th><th>Duration</th><th>Distance</th><th>Avg SOG</th><th>Max SOG</th><th>Avg VMG</th><th>Avg CWA</th><th>Avg heel</th><th>Heel stability</th><th>Pitch</th><th>Steering stability</th><th>Speed stability</th></tr></thead><tbody id="straightRows"></tbody></table></div><p class="muted small">Stability values describe variation, not a score; compare similar conditions and treat inferred wind and course values cautiously.</p></div><div class="panel"><h3>2. Tack analysis</h3><p class="muted small">Entry, minimum and exit speed; VMG and distance through the turn; turn angle, rotation rate, heel, deceleration and recovery acceleration.</p><div class="table-wrap"><table><thead><tr><th>#</th><th>Entry SOG</th><th>Min SOG</th><th>Exit SOG</th><th>Avg VMG</th><th>Min VMG</th><th>VMG distance</th><th>Turn angle</th><th>Max rate</th><th>Max heel</th><th>Max decel</th><th>Max accel</th></tr></thead><tbody id="tackRows"></tbody></table></div></div><div class="panel"><h3>3. Gybe analysis</h3><p class="muted small">The same maneuver metrics are used to compare gybes. Detection is inferred from GPS course changes and may miss or misclassify maneuvers with sparse samples.</p><div class="table-wrap"><table><thead><tr><th>#</th><th>Entry SOG</th><th>Min SOG</th><th>Exit SOG</th><th>Avg VMG</th><th>Min VMG</th><th>VMG distance</th><th>Turn angle</th><th>Max rate</th><th>Max heel</th><th>Max decel</th><th>Max accel</th></tr></thead><tbody id="gybeRows"></tbody></table></div></div><div class="panel"><h3>Sailing stability &amp; angles</h3><div class="analysis-stats-grid"><div class="analysis-stat"><span class="metric-label">COG / COURSE</span><strong id="aCog">—</strong></div><div class="analysis-stat"><span class="metric-label">CWA / COURSE-WIND ANGLE</span><strong id="aCwa">—</strong></div><div class="analysis-stat"><span class="metric-label">HEEL STABILITY</span><strong id="aHeelStability">—</strong></div><div class="analysis-stat"><span class="metric-label">PITCH</span><strong id="aPitch">—</strong></div><div class="analysis-stat"><span class="metric-label">SPEED STABILITY</span><strong id="aSpeedStability">—</strong></div><div class="analysis-stat"><span class="metric-label">MANEUVERS DETECTED</span><strong id="aManeuvers">—</strong></div></div></div><div class="panel"><h3>Recent samples</h3><div class="table-wrap"><table><thead><tr><th>Time</th><th>SOG (kn)</th><th>COG</th><th>Heel</th><th>Pitch</th><th>Accuracy (m)</th></tr></thead><tbody id="sampleRows"></tbody></table></div></div></div></section>
+<section class="view" id="view-wind">
+<div class="section-head"><div><p class="eyebrow wind-color">UPWIND TACTICS</p><h2>Wind shifts</h2></div><div class="live-pill wind-pill">Port / Starboard</div></div>
+<div class="panel wind-hero"><span class="metric-label">ESTIMATED WIND DIRECTION</span><div class="wind-big"><span id="windDirection">—</span><small>°</small></div><p class="muted small">Estimated as the angular bisector of average GPS courses recorded on each upwind tack.</p></div>
+<div class="shift-visual" id="shiftVisual"><div class="shift-side left-shift"><span>LEFT SHIFT</span><strong id="leftShift">—</strong><small>counter-clockwise</small></div><div class="shift-center"><div class="compass-ring"><span>N</span><span>E</span><span>S</span><span>W</span><div class="compass-needle" id="windNeedle"></div></div><span class="small muted" id="windBaselineLabel">Baseline not set</span></div><div class="shift-side right-shift"><span>RIGHT SHIFT</span><strong id="rightShift">—</strong><small>clockwise</small></div></div>
+<div class="panel controls"><h3>Record an upwind leg</h3><p class="muted small">Tap the relevant tack when you settle onto that tack, sail a reasonably steady upwind leg, then tap the other tack after the tack. Each completed leg is averaged from its GPS course samples.</p><div class="button-row"><button class="port-btn" id="portTack">↶ Start PORT tack</button><button class="starboard-btn" id="starboardTack">↷ Start STARBOARD tack</button></div><div class="metric-grid top-space"><div class="panel inset"><span class="metric-label">PORT LEGS</span><strong id="portCount">0</strong><span class="muted small" id="portMean">Average course —</span></div><div class="panel inset"><span class="metric-label">STARBOARD LEGS</span><strong id="starboardCount">0</strong><span class="muted small" id="starboardMean">Average course —</span></div></div><div class="button-row"><button class="secondary" id="setWindBaseline">Set current direction as baseline</button><button class="secondary" id="resetWindData">Clear wind data</button></div><p class="notice" id="windResult">Start a session, enable GPS, then mark a steady upwind leg on each tack.</p></div>
+<div class="panel"><h3>How to read the shifts</h3><p class="muted small">The current direction is estimated from the bisector between the average courses of port and starboard upwind legs. A clockwise change is shown as a right shift; a counter-clockwise change as a left shift. GPS course over ground is affected by current, leeway, waves and poor GPS fixes, so use steady legs and compare repeated samples. This is an estimate, not a replacement for a wind sensor.</p></div>
+</section>
+<section class="view" id="view-settings"><div class="section-head"><div><p class="eyebrow">APP CONFIGURATION</p><h2>Settings</h2></div></div><div class="panel form-panel"><h3>Sensors &amp; calibration</h3><label>Color theme<select id="settingsTheme"><option value="dark">Dark</option><option value="light">Light</option><option value="blue">Ocean Blue</option><option value="purple">Electric Violet</option><option value="yellow">Solar Yellow</option></select></label><label>Analysis sailing mode<select id="sailingMode"><option value="auto">Auto detect</option><option value="upwind">Upwind focus</option><option value="downwind">Downwind focus</option></select></label><div class="button-row"><button class="secondary" id="settingsGpsToggle">Enable GPS</button><button class="secondary" id="sensorBtn">Enable IMU / motion sensors</button></div><p class="muted small">GPS and motion sensor permissions are controlled by the browser. GPS recording also starts when you start a session.</p><div class="button-row"><button class="secondary" id="zeroHeelBtn">Set HEEL zero</button><button class="secondary" id="zeroPitchBtn">Set PITCH zero</button></div><p class="muted small" id="zeroStatus">Zero offsets: not calibrated.</p><div class="button-row"><button class="secondary" id="wakeLockBtn">Keep screen awake</button><button class="secondary" id="lockScreenBtn">Lock screen</button></div></div><div class="panel controls"><h3>Customize dashboard widgets</h3><p class="muted small">Choose a widget, adjust its size and colors, hide it, or change its order. Drag cards directly in the dashboard when edit mode is active.</p><label>Widget<select id="widgetSelect"><option value="live-sog">GPS speed / SOG</option><option value="live-course">COG</option><option value="live-accuracy">GPS accuracy</option><option value="live-heel">Heel</option><option value="live-pitch">Pitch</option><option value="live-duration">Duration</option><option value="live-samples">Samples</option><option value="map">Boat &amp; start-line map</option><option value="trim">Manual trim</option><option value="wind">Wind shift</option><option value="line">Start-line timing</option><option value="chart">Heel &amp; trim chart</option><option value="live-position">GPS position</option></select></label><div class="form-grid"><label>Widget width<select id="widgetWidth"><option value="half">Half width</option><option value="full">Full width</option></select></label><label>Font size<select id="widgetFont"><option value="small">Small</option><option selected="" value="medium">Medium</option><option value="large">Large</option><option value="xlarge">Extra large</option></select></label></div><div class="form-grid"><label>Background color<input id="widgetBg" type="color" value="#101f2e"/></label><label>Text color<input id="widgetColor" type="color" value="#f1f6fa"/></label></div><div class="button-row"><button class="secondary" id="widgetUp">Move up</button><button class="secondary" id="widgetDown">Move down</button></div><div class="button-row"><button class="secondary" id="widgetHide">Hide / show</button><button class="secondary" id="widgetReset">Reset layout</button></div></div><div class="section-head"><div><p class="eyebrow">LOCAL ARCHIVE</p><h2>Session archive</h2></div></div><div class="panel">
+<h3>Saved sessions</h3><div class="sessions-list" id="sessionsList"><p class="muted">No saved sessions.</p></div>
+</div><div class="panel">
+<h3>Export and import</h3>
+<p class="muted small">Export the current session or a session from history. GPX import preserves timestamps, coordinates and altitude when present; missing values are not fabricated.</p>
+<div class="button-row"><button class="secondary" id="exportJson">Export JSON</button><button class="secondary" id="exportCsv">Export CSV</button></div>
+<label class="file-label">Import GPX track<input accept=".gpx,application/gpx+xml" id="gpxInput" type="file"/></label>
+<div class="muted small" id="importMessage"></div>
+</div><div class="panel">
+<h3>Full backup</h3><button class="primary full" id="backupBtn">Download all sessions (JSON)</button>
+<p class="muted small">Keep regular backups: clearing browser data may delete sessions.</p>
+</div><span hidden="True" id="sampleRate"></span></section></main>
+<nav aria-label="Main navigation" class="bottom-nav"><button class="nav-item active" data-view="cockpit"><span>▦</span>DASHBOARD</button><button class="nav-item" data-view="race"><span>⚑</span>START</button><button class="nav-item" data-view="session"><span>⏱</span>SESSION</button><button class="nav-item" data-view="analysis"><span>⌁</span>ANALYSIS</button><button class="nav-item" data-view="wind"><span>↗</span>WIND</button><button class="nav-item" data-view="settings"><span>⚙</span>SETTINGS</button></nav>
+<div aria-hidden="true" class="screen-lock-overlay" id="screenLockOverlay">
+<div class="lock-card"><div class="lock-symbol">⌑</div><h2>Screen locked</h2><p>Press and hold anywhere on this screen for 3 seconds to unlock.</p><p class="muted small">Keep the phone mounted securely. This lock only prevents accidental app touches; it is not a device-level security lock.</p><div id="tapProgress">HOLD FOR 3 SECONDS</div></div>
+</div>
+<div aria-live="polite" class="toast" id="toast" role="status"></div>
+<script crossorigin="" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>
