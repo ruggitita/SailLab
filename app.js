@@ -8,7 +8,8 @@ let savedFlags=JSON.parse(localStorage.getItem('saillabFlags')||'[]');
 let flagPhotoData=null;
 let zeroOffsets=JSON.parse(localStorage.getItem('saillabZeroOffsets')||'{"heel":0,"pitch":0}');
 let widgetPrefs=JSON.parse(localStorage.getItem('saillabWidgetPrefs')||'{}');
-let quickSelectedWidget='live-sog';
+let customWidgetDefs=JSON.parse(localStorage.getItem('saillabCustomWidgets')||'[]');
+let activePointerEdit=null;
 let wakeLock=null, locked=false, unlockHoldTimer=null;
 const KNOTS_PER_MS=1.943844;
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2600)}
@@ -25,11 +26,23 @@ function currentMeta(){const meta={name:$('sessionName').value.trim()||'Sailing 
 function correctedMotion(channel){
   return motion[channel]==null ? null : motion[channel] - (Number(zeroOffsets[channel]) || 0);
 }
+function widgetDecimals(id,fallback=1){const d=widgetPrefs[id]?.decimals;return Number.isInteger(d)?Math.max(0,Math.min(3,d)):fallback}
+function widgetNumber(id,value,fallback=1){return Number.isFinite(value)?value.toFixed(widgetDecimals(id,fallback)):'—'}
+function updateExtraBarValues(){
+ document.querySelectorAll('#dashboardGrid [data-widget]').forEach(card=>{const bar=card.querySelector('.custom-extra-bar');if(!bar)return;const id=card.dataset.widget;let value=null,max=1;
+  if(id==='live-sog'){value=lastFix?.coords.speed==null?null:lastFix.coords.speed*KNOTS_PER_MS;max=20}
+  else if(id==='live-course'){value=lastFix?.coords.heading??null;max=360}
+  else if(id==='live-heel'){value=correctedMotion('heel');max=16;value=value==null?null:Math.abs(value)}
+  else if(id==='trim'){value=correctedMotion('pitch');max=4;value=value==null?null:Math.abs(value)}
+  else if(id==='wind-detail'){value=autoWindState.direction==null?null:Math.abs(angularDelta(autoWindState.direction,windBaseline??autoWindState.direction));max=30}
+  bar.style.setProperty('--bar-progress',`${value==null?0:Math.max(0,Math.min(100,value/max*100))}%`);bar.classList.toggle('unknown',value==null);
+ });
+}
 function updateMotionDisplay(){
   const heel=correctedMotion('heel'), pitch=correctedMotion('pitch');
-  if($('heel'))$('heel').textContent = heel==null ? '—' : `${Math.round(heel)}`;
+  if($('heel'))$('heel').textContent = widgetNumber('live-heel',heel,0);
   if($('pitch'))$('pitch').textContent = pitch==null ? '—' : `${(Math.round(pitch / 0.5) * 0.5).toFixed(1)}`;
-  $('zeroStatus').textContent=`Zero offsets — HEEL: ${(Number(zeroOffsets.heel)||0).toFixed(1)}°, PITCH: ${(Number(zeroOffsets.pitch)||0).toFixed(1)}°.`;
+  $('zeroStatus').textContent=`Zero offsets — HEEL: ${(Number(zeroOffsets.heel)||0).toFixed(1)}°, PITCH: ${(Number(zeroOffsets.pitch)||0).toFixed(1)}°.`;updateExtraBarValues();
 }
 function onOrientation(e){
   // DeviceOrientationEvent angles describe the phone, not the boat; secure mounting/alignment is required.
@@ -72,6 +85,29 @@ function applyWidgetPrefs(){
     card.style.background=p.bg||'';
     card.style.color=p.color||'';
     card.style.setProperty('--widget-text',p.color||'');
+    if(p.valueSize!==undefined)card.style.setProperty('--custom-value-size',`${Number(p.valueSize)}px`);else card.style.removeProperty('--custom-value-size');
+    if(p.labelSize!==undefined)card.style.setProperty('--custom-label-size',`${Number(p.labelSize)}px`);else card.style.removeProperty('--custom-label-size');
+    if(p.secondarySize!==undefined)card.style.setProperty('--custom-secondary-size',`${Number(p.secondarySize)}px`);else card.style.removeProperty('--custom-secondary-size');
+    if(p.barThickness!==undefined)card.style.setProperty('--custom-bar-thickness',`${Number(p.barThickness)}px`);else card.style.removeProperty('--custom-bar-thickness');
+    card.classList.toggle('odometer-mode',p.odometer===true||card.dataset.mode==='odometer');
+    if(card.classList.contains('custom-metric-card')){const def=customWidgetDefs.find(w=>w.id===id),label=card.querySelector('.custom-label');if(label&&def)label.textContent=p.customLabel||def.label||'Custom';const units=card.querySelector('.custom-units');if(units)units.textContent=p.customUnits??def?.units??'';}
+    else if(p.customLabel){const label=card.querySelector('.metric-label');if(label){const small=label.querySelector('small');label.childNodes.forEach(n=>{if(n.nodeType===Node.TEXT_NODE)n.textContent=''});label.insertBefore(document.createTextNode(p.customLabel+' '),small||null)}const unit=card.querySelector('.ios-value small')||card.querySelector('.metric-label small');if(unit&&p.customUnits!==undefined)unit.textContent=p.customUnits;}
+    card.querySelectorAll('[data-part]').forEach(part=>{
+      const partName=part.dataset.part;
+      const visible=p.parts?.[partName]!==false;
+      part.classList.toggle('custom-part-hidden',!visible);
+      const offset=p.offsets?.[partName]||{x:0,y:0};
+      const scale=partName==='bar'?(Number(p.barScale)||100)/100:1;
+      part.style.transform=`translate(${Number(offset.x)||0}px,${Number(offset.y)||0}px) scale(${scale})`;
+      part.style.transformOrigin='center center';
+    });
+    const scaleEls=card.querySelectorAll('.heel-scale,.trim-scale');
+    scaleEls.forEach(el=>el.classList.toggle('custom-part-hidden',p.showScale===false));
+    if(p.parts?.bar===false){card.querySelectorAll('.heel-bubble-wrap,.trim-gauge-wrap,.ewd-shift-line').forEach(el=>el.classList.add('custom-part-hidden'))}
+    let extra=card.querySelector('.custom-extra-bar');
+    if(p.extraBar===true&&!extra){extra=document.createElement('div');extra.className='custom-extra-bar';extra.dataset.part='extraBar';extra.innerHTML='<span></span>';const foot=card.querySelector('.ios-foot');card.insertBefore(extra,foot||null)}
+    if(p.extraBar!==true&&extra)extra.remove();
+    if(extra){extra.style.transform=`translate(${Number(p.offsets?.extraBar?.x)||0}px,${Number(p.offsets?.extraBar?.y)||0}px) scale(${(Number(p.barScale)||100)/100})`;extra.style.setProperty('--extra-thickness',`${Number(p.barThickness)||12}px`)}
     if(p.order!==undefined){
       const parent=card.parentElement;
       if(parent)parent.appendChild(card);
@@ -79,6 +115,7 @@ function applyWidgetPrefs(){
   });
   cards.sort((a,b)=>(widgetPrefs[a.dataset.widget]?.order??100)-(widgetPrefs[b.dataset.widget]?.order??100)).forEach(card=>card.parentElement?.appendChild(card));
   loadWidgetForm();
+  if(document.body.classList.contains('dashboard-editing')||document.body.classList.contains('dashboard-fullscreen'))applyCanvasLayout(true);
 }
 function loadWidgetForm(){
   const id=$('widgetSelect')?.value;if(!id)return;
@@ -149,83 +186,143 @@ function startUnlockHold(){
 function cancelUnlockHold(){clearTimeout(unlockHoldTimer);unlockHoldTimer=null;if(locked)$('tapProgress').textContent='LONG PRESS TO UNLOCK'}
 function renderWidgetVisibility(){
  const host=$('widgetVisibilityList');if(!host)return;host.innerHTML='';
- const labels={'live-sog':'SOG','live-course':'COG','live-heel':'HEEL','trim':'TRIM','wind-detail':'EWD'};
+ const labels={'live-sog':'SOG','live-course':'COG','live-heel':'HEEL','trim':'TRIM','wind-detail':'EWD'};customWidgetDefs.forEach(w=>labels[w.id]=w.label||'Custom');
  Object.entries(labels).forEach(([id,label])=>{const row=document.createElement('label');row.className='widget-visibility-item';const cb=document.createElement('input');cb.type='checkbox';cb.checked=widgetPrefs[id]?.visibilityOverride===true?widgetPrefs[id]?.hidden!==true:!(widgetPrefs[id]?.hidden===true||(localStorage.getItem('saillabDashboardLayout')==='minimal'&&id==='trim'));cb.addEventListener('change',()=>{widgetPrefs[id]={...(widgetPrefs[id]||{}),hidden:!cb.checked,visibilityOverride:true};localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs();applyDashboardLayout();});const span=document.createElement('span');span.textContent=label;row.append(cb,span);host.append(row)});
 }
 function loadEditorWidgetForm(){
  const id=$('editorWidgetSelect')?.value;if(!id)return;
- const p=widgetPrefs[id]||{};
+ const p=widgetPrefs[id]||{}, parts=p.parts||{}, offsets=p.offsets||{};
  $('editorWidgetWidth').value=p.width||'half';$('editorWidgetFont').value=p.font||'medium';
  $('editorWidgetBg').value=p.bg||'#101f2e';$('editorWidgetColor').value=p.color||'#f1f6fa';
+ const defaultSizes={'live-sog':96,'live-course':72,'live-heel':68,'trim':68,'wind-detail':68};
+ $('editorValueSize').value=p.valueSize||defaultSizes[id]||68;$('editorLabelSize').value=p.labelSize||9;$('editorSecondarySize').value=p.secondarySize||10;
+ $('editorDecimals').value=p.decimals===undefined?'default':String(p.decimals);
+ $('editorBarScale').value=p.barScale||100;$('editorBarThickness').value=p.barThickness||12;
+ $('editorPositionPart').value=p.positionPart||'value';const off=offsets[$('editorPositionPart').value]||{x:0,y:0};$('editorOffsetX').value=off.x||0;$('editorOffsetY').value=off.y||0;
+ $('editorOdometer').checked=p.odometer===true;
+ $('partShowLabel').checked=parts.label!==false;$('partShowValue').checked=parts.value!==false;$('partShowSecondary').checked=parts.secondary!==false;$('partShowAverages').checked=parts.averages!==false;$('partShowBar').checked=parts.bar!==false;$('partShowScale').checked=p.showScale!==false;$('partShowExtraBar').checked=p.extraBar===true;
  $('editorWidgetHide').textContent=p.hidden?'Show widget':'Hide widget';
+ const def=customWidgetDefs.find(w=>w.id===id);const card=document.querySelector(`#dashboardGrid [data-widget="${id}"]`);const defaultLabel=def?.label||({ 'live-sog':'SOG','live-course':'COG','live-heel':'HEEL','trim':'TRIM','wind-detail':'EWD'}[id]||'Widget');
+ $('editorCustomLabel').value=p.customLabel??defaultLabel;$('editorCustomUnits').value=p.customUnits??def?.units??(card?.querySelector('.ios-value small')?.textContent||card?.querySelector('.metric-label small')?.textContent||'');
+ $('deleteCustomWidget').hidden=!id.startsWith('custom-');
+ updateFineTuneOutputs();
+}
+function updateFineTuneOutputs(){
+ const pairs=[['editorValueSize','editorValueSizeOut',' px'],['editorLabelSize','editorLabelSizeOut',' px'],['editorSecondarySize','editorSecondarySizeOut',' px'],['editorOffsetX','editorOffsetXOut',' px'],['editorOffsetY','editorOffsetYOut',' px'],['editorBarScale','editorBarScaleOut','%'],['editorBarThickness','editorBarThicknessOut',' px']];
+ pairs.forEach(([input,out,suffix])=>{if($(input)&&$(out))$(out).textContent=$(input).value+suffix});
 }
 function saveEditorWidget(){
- const id=$('editorWidgetSelect').value;
- widgetPrefs[id]={...(widgetPrefs[id]||{}),width:$('editorWidgetWidth').value,font:$('editorWidgetFont').value,bg:$('editorWidgetBg').value,color:$('editorWidgetColor').value};
- localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs();applyDashboardLayout();loadEditorWidgetForm();renderWidgetVisibility();
+ const id=$('editorWidgetSelect').value,prev=widgetPrefs[id]||{},partName=$('editorPositionPart').value,offsets={...(prev.offsets||{})};
+ offsets[partName]={x:Number($('editorOffsetX').value)||0,y:Number($('editorOffsetY').value)||0};
+ widgetPrefs[id]={...prev,width:$('editorWidgetWidth').value,font:$('editorWidgetFont').value,bg:$('editorWidgetBg').value,color:$('editorWidgetColor').value,customLabel:$('editorCustomLabel').value.trim(),customUnits:$('editorCustomUnits').value.trim(),
+  valueSize:Number($('editorValueSize').value),labelSize:Number($('editorLabelSize').value),secondarySize:Number($('editorSecondarySize').value),
+  decimals:$('editorDecimals').value==='default'?undefined:Number($('editorDecimals').value),barScale:Number($('editorBarScale').value),barThickness:Number($('editorBarThickness').value),
+  positionPart:partName,offsets,odometer:$('editorOdometer').checked,showScale:$('partShowScale').checked,extraBar:$('partShowExtraBar').checked,
+  parts:{...(prev.parts||{}),label:$('partShowLabel').checked,value:$('partShowValue').checked,secondary:$('partShowSecondary').checked,averages:$('partShowAverages').checked,bar:$('partShowBar').checked}};
+ if(prev.canvas){const c={...prev.canvas};if($('editorWidgetWidth').value==='full'){c.w=Math.max(c.w,96);c.x=2}else if(prev.width==='full'&&$('editorWidgetWidth').value==='half'){c.w=47;c.x=Math.min(c.x,51)}widgetPrefs[id].canvas=c;}
+ const def=customWidgetDefs.find(w=>w.id===id);if(def){def.label=$('editorCustomLabel').value.trim()||'Custom';def.units=$('editorCustomUnits').value.trim();localStorage.setItem('saillabCustomWidgets',JSON.stringify(customWidgetDefs));syncEditorWidgetOptions();}
+ localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs();applyDashboardLayout();applyCanvasLayout(document.body.classList.contains('dashboard-editing')||document.body.classList.contains('dashboard-fullscreen'));updateFineTuneOutputs();renderWidgetVisibility();
 }
 function openDashboardEditor(){
  if(locked)unlockScreen();
- $('dashboardEditor').hidden=false;$('phoneQuickEditor').hidden=false;document.body.classList.add('dashboard-editing');
- loadEditorWidgetForm();renderWidgetVisibility();selectQuickWidget($('editorWidgetSelect').value||quickSelectedWidget);$('dashboardEditor').scrollIntoView({behavior:'smooth',block:'start'});
+ $('dashboardEditor').hidden=false;document.body.classList.add('dashboard-editing');
+ initCustomWidgets();syncEditorWidgetOptions();applyWidgetPrefs();applyCanvasLayout(true);setupCanvasDragHandles();
+ loadEditorWidgetForm();renderWidgetVisibility();$('dashboardPhoneFrame').scrollIntoView({behavior:'smooth',block:'center'});
 }
 function closeDashboardEditor(){
- $('dashboardEditor').hidden=true;$('phoneQuickEditor').hidden=true;document.body.classList.remove('dashboard-editing');document.querySelectorAll('#dashboardGrid [data-widget]').forEach(el=>el.classList.remove('quick-selected'));
+ $('dashboardEditor').hidden=true;document.body.classList.remove('dashboard-editing');teardownCanvasDragHandles();if(!document.body.classList.contains('dashboard-fullscreen'))applyCanvasLayout(false);
 }
 async function enterDashboardFullscreen(){
  closeDashboardEditor();
  document.body.classList.add('cockpit-presentation','dashboard-fullscreen');
- $('exitDashboardBtn').hidden=false;
+ $('exitDashboardBtn').hidden=false;applyCanvasLayout(true);
  try{if(!document.fullscreenElement&&document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen()}catch(e){/* CSS fullscreen fallback remains available */}
  try{if('wakeLock' in navigator&&!wakeLock)wakeLock=await navigator.wakeLock.request('screen')}catch(e){}
  toast('Dashboard full screen · tap Exit to return');
 }
 async function exitDashboardFullscreen(){
- document.body.classList.remove('cockpit-presentation','dashboard-fullscreen');$('exitDashboardBtn').hidden=true;
+ document.body.classList.remove('cockpit-presentation','dashboard-fullscreen');$('exitDashboardBtn').hidden=true;applyCanvasLayout(false);
  if(document.fullscreenElement&&document.exitFullscreen){try{await document.exitFullscreen()}catch(e){}}
  if(wakeLock){try{await wakeLock.release()}catch(e){}wakeLock=null}
 }
-function quickWidgetName(id){return ({'live-sog':'SOG','live-course':'COG','live-heel':'HEEL','trim':'TRIM','wind-detail':'EWD'})[id]||id}
-function selectQuickWidget(id){
- const card=document.querySelector(`#dashboardGrid [data-widget="${id}"]`);if(!card)return;
- quickSelectedWidget=id;
- document.querySelectorAll('#dashboardGrid [data-widget]').forEach(el=>el.classList.toggle('quick-selected',el.dataset.widget===id));
- $('quickSelectedName').textContent=quickWidgetName(id);
- $('editorWidgetSelect').value=id;$('widgetSelect').value=id;loadEditorWidgetForm();loadWidgetForm();updateQuickEditorControls();
+function syncEditorWidgetOptions(){
+ const select=$('editorWidgetSelect');if(!select)return;const existing=new Set([...select.options].map(o=>o.value));
+ customWidgetDefs.forEach(w=>{let opt=[...select.options].find(o=>o.value===w.id);if(!opt){opt=document.createElement('option');opt.value=w.id;select.append(opt)}opt.textContent=`${w.label||'Custom'} · custom`});
+ [...select.options].forEach(o=>{if(o.value.startsWith('custom-')&&!customWidgetDefs.some(w=>w.id===o.value))o.remove()});
 }
-function updateQuickEditorControls(){
- const p=widgetPrefs[quickSelectedWidget]||{};
- $('quickWidth').textContent=(p.width||'half')==='full'?'Full width ✓':'Half width';
- const fonts=['small','medium','large','xlarge'],font=p.font||'medium';
- $('quickFontDown').disabled=fonts.indexOf(font)<=0;$('quickFontUp').disabled=fonts.indexOf(font)>=fonts.length-1;
- $('quickToggleVisibility').textContent=p.hidden?'Show':'Hide';
+function initCustomWidgets(){
+ const grid=$('dashboardGrid');if(!grid)return;
+ customWidgetDefs.forEach(def=>{if(grid.querySelector(`[data-widget="${def.id}"]`))return;const card=document.createElement('article');card.className='panel dash-widget ios-card custom-metric-card';card.dataset.widget=def.id;card.dataset.source=def.source;card.dataset.mode=def.mode||'number';card.innerHTML=`<div class="ios-card-head" data-part="label"><span class="ios-symbol custom-symbol">+</span><span class="metric-label custom-label"></span></div><div class="ios-value custom-main-value" data-part="value"><span class="custom-value">—</span><small class="custom-units"></small></div><div class="custom-widget-meter" data-part="bar" hidden><span></span></div><div class="ios-foot custom-secondary" data-part="secondary"></div>`;card.querySelector('.custom-label').textContent=def.label||'Custom';card.querySelector('.custom-units').textContent=def.units||'';card.querySelector('.custom-secondary').textContent=`${def.source.toUpperCase()} · ${def.mode||'number'}`;if(def.mode==='bar')card.querySelector('.custom-widget-meter').hidden=false;if(def.mode==='odometer')card.classList.add('odometer-mode');grid.append(card)});
+ syncEditorWidgetOptions();
 }
-function saveQuickPrefs(patch){
- const id=quickSelectedWidget;widgetPrefs[id]={...(widgetPrefs[id]||{}),...patch};
- localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));
- applyWidgetPrefs();applyDashboardLayout();selectQuickWidget(id);renderWidgetVisibility();
+function createCustomWidget(){
+ const label=$('newWidgetLabel').value.trim()||'Custom';const source=$('newWidgetSource').value;const mode=$('newWidgetMode').value;const units=$('newWidgetUnits').value.trim()||({sog:'kn',cog:'°',heel:'°',trim:'°',ewd:'°',clock:'', 'gps-accuracy':'m'}[source]||'');
+ const id='custom-'+Date.now().toString(36);const def={id,label,source,mode,units};customWidgetDefs.push(def);localStorage.setItem('saillabCustomWidgets',JSON.stringify(customWidgetDefs));
+ initCustomWidgets();widgetPrefs[id]={width:'half',font:'medium',valueSize:44,labelSize:9,secondarySize:9,bg:'#101f2e',color:'#f1f6fa'};localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));
+ const select=$('editorWidgetSelect');select.value=id;applyWidgetPrefs();applyCanvasLayout(true);setupCanvasDragHandles();loadEditorWidgetForm();renderWidgetVisibility();renderCustomWidgets();toast('Custom widget created — drag it into position');
 }
-function quickFontStep(delta){const fonts=['small','medium','large','xlarge'],p=widgetPrefs[quickSelectedWidget]||{},i=fonts.indexOf(p.font||'medium');saveQuickPrefs({font:fonts[Math.max(0,Math.min(fonts.length-1,i+delta))]})}
-function setupQuickPhoneEditor(){
- const host=$('dashboardGrid');
- host.addEventListener('click',e=>{if(!document.body.classList.contains('dashboard-editing'))return;if(e.target.closest('button,input,select,a'))return;const card=e.target.closest('[data-widget]');if(card){e.preventDefault();selectQuickWidget(card.dataset.widget)}});
- $('quickMoveUp').onclick=()=>{$('widgetSelect').value=quickSelectedWidget;moveWidget(-1);selectQuickWidget(quickSelectedWidget)};
- $('quickMoveDown').onclick=()=>{$('widgetSelect').value=quickSelectedWidget;moveWidget(1);selectQuickWidget(quickSelectedWidget)};
- $('quickWidth').onclick=()=>{const p=widgetPrefs[quickSelectedWidget]||{};saveQuickPrefs({width:(p.width||'half')==='full'?'half':'full'})};
- $('quickFontDown').onclick=()=>quickFontStep(-1);$('quickFontUp').onclick=()=>quickFontStep(1);
- $('quickToggleVisibility').onclick=()=>{const p=widgetPrefs[quickSelectedWidget]||{};saveQuickPrefs({hidden:!p.hidden,visibilityOverride:true})};
- document.querySelectorAll('[data-quick-bg]').forEach(btn=>btn.addEventListener('click',()=>saveQuickPrefs({bg:btn.dataset.quickBg==='transparent'?'':btn.dataset.quickBg})));
+function deleteSelectedCustomWidget(){
+ const id=$('editorWidgetSelect').value;if(!id.startsWith('custom-'))return;if(!confirm('Delete this custom widget?'))return;
+ customWidgetDefs=customWidgetDefs.filter(w=>w.id!==id);localStorage.setItem('saillabCustomWidgets',JSON.stringify(customWidgetDefs));delete widgetPrefs[id];localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));document.querySelector(`#dashboardGrid [data-widget="${id}"]`)?.remove();syncEditorWidgetOptions();renderWidgetVisibility();$('editorWidgetSelect').value='live-sog';applyWidgetPrefs();applyCanvasLayout(true);loadEditorWidgetForm();toast('Custom widget deleted');
 }
+function sourceWidgetValue(def){
+ const source=def.source;let value=null,max=1,unit=def.units||'';
+ if(source==='sog'){value=lastFix?.coords.speed==null?null:lastFix.coords.speed*KNOTS_PER_MS;max=20}
+ else if(source==='cog'){value=lastFix?.coords.heading??null;max=360}
+ else if(source==='heel'){value=correctedMotion('heel');max=16}
+ else if(source==='trim'){value=correctedMotion('pitch');max=4}
+ else if(source==='ewd'){value=autoWindState.direction;max=360}
+ else if(source==='clock'){value=elapsed()/1000;max=3600;unit=''}
+ else if(source==='gps-accuracy'){value=lastFix?.coords.accuracy??null;max=50}
+ return {value,max,unit};
+}
+function renderCustomWidgets(){
+ if(!$('dashboardGrid'))return;
+ customWidgetDefs.forEach(def=>{const card=$(`widget-${def.id}`)||document.querySelector(`#dashboardGrid [data-widget="${def.id}"]`);if(!card)return;const {value,max,unit}=sourceWidgetValue(def);const val=card.querySelector('.custom-value');if(val){if(value==null||!Number.isFinite(value))val.textContent='—';else if(def.source==='clock')val.textContent=fmtTime(value*1000);else val.textContent=widgetNumber(def.id,value,def.source==='cog'||def.source==='ewd'||def.source==='gps-accuracy'?0:1)}const u=card.querySelector('.custom-units');if(u)u.textContent=unit;const meter=card.querySelector('.custom-widget-meter');if(meter){meter.hidden=def.mode!=='bar';meter.querySelector('span').style.width=`${value==null?0:Math.max(0,Math.min(100,Math.abs(value)/max*100))}%`}card.classList.toggle('odometer-mode',def.mode==='odometer'||widgetPrefs[def.id]?.odometer===true);});
+}
+const defaultCanvasPositions={
+ race:{'live-sog':{x:2,y:2,w:47,h:18},'live-course':{x:51,y:2,w:47,h:18},'live-heel':{x:2,y:22,w:47,h:22},trim:{x:51,y:22,w:47,h:22},'wind-detail':{x:2,y:46,w:96,h:24}},
+ balanced:{'live-sog':{x:2,y:2,w:47,h:18},'live-course':{x:51,y:2,w:47,h:18},'wind-detail':{x:2,y:22,w:96,h:23},'live-heel':{x:2,y:47,w:47,h:22},trim:{x:51,y:47,w:47,h:22}},
+ minimal:{'live-sog':{x:2,y:3,w:47,h:22},'live-course':{x:51,y:3,w:47,h:22},'live-heel':{x:2,y:27,w:47,h:23},trim:{x:51,y:27,w:47,h:23},'wind-detail':{x:2,y:52,w:96,h:24}},
+ big:{'live-sog':{x:2,y:2,w:96,h:20},'live-course':{x:2,y:24,w:47,h:19},'live-heel':{x:51,y:24,w:47,h:19},trim:{x:2,y:45,w:47,h:24},'wind-detail':{x:51,y:45,w:47,h:24}}
+};
+function canvasDefaultFor(id,index,layout){const positions=defaultCanvasPositions[layout]||defaultCanvasPositions.race;if(positions[id])return {...positions[id]};const n=Math.max(0,index-5);return {x:n%2?51:2,y:73+Math.floor(n/2)*12,w:47,h:11}}
+function applyCanvasLayout(enable,resetPositions=false){
+ const grid=$('dashboardGrid'),frame=$('dashboardPhoneFrame');if(!grid||!frame)return;
+ const canvasActive=enable===true;
+ grid.classList.toggle('free-position-canvas',canvasActive);frame.classList.toggle('phone-canvas-active',canvasActive);
+ if(!canvasActive){[...grid.querySelectorAll('[data-widget]')].forEach(card=>{['position','left','top','width','height','zIndex'].forEach(k=>card.style[k]='');card.classList.remove('canvas-selected','canvas-dragging')});teardownCanvasDragHandles();return}
+ const layout=localStorage.getItem('saillabDashboardLayout')||'race';const cards=[...grid.querySelectorAll('[data-widget]')];
+ cards.forEach((card,index)=>{const id=card.dataset.widget;const pref=widgetPrefs[id]||{};let pos=pref.canvas;if(resetPositions||!pos)pos=canvasDefaultFor(id,index,layout);pos={x:Number(pos.x)||0,y:Number(pos.y)||0,w:Number(pos.w)||47,h:Number(pos.h)||18};pos.x=Math.max(0,Math.min(100-pos.w,pos.x));pos.y=Math.max(0,Math.min(100-pos.h,pos.y));widgetPrefs[id]={...pref,canvas:pos};card.style.position='absolute';card.style.left=pos.x+'%';card.style.top=pos.y+'%';card.style.width=pos.w+'%';card.style.height=pos.h+'%';card.style.zIndex=String(pref.zIndex||index+1);card.classList.toggle('canvas-selected',id===$('editorWidgetSelect')?.value);});
+ localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));if(document.body.classList.contains('dashboard-editing'))setupCanvasDragHandles();
+}
+function selectCanvasCard(card){if(!card)return;const id=card.dataset.widget;const sel=$('editorWidgetSelect');if(sel&&[...sel.options].some(o=>o.value===id)){sel.value=id;loadEditorWidgetForm()}document.querySelectorAll('#dashboardGrid [data-widget]').forEach(c=>c.classList.toggle('canvas-selected',c===card));}
+function setupCanvasDragHandles(){
+ const grid=$('dashboardGrid');if(!grid||!document.body.classList.contains('dashboard-editing'))return;
+ grid.querySelectorAll('[data-widget]').forEach(card=>{if(!card.querySelector('.canvas-resize-handle')){const h=document.createElement('button');h.type='button';h.className='canvas-resize-handle';h.setAttribute('aria-label','Resize widget');h.textContent='↘';card.append(h)}card.classList.add('canvas-draggable')});
+}
+function teardownCanvasDragHandles(){document.querySelectorAll('.canvas-resize-handle').forEach(h=>h.remove());document.querySelectorAll('.canvas-draggable').forEach(c=>c.classList.remove('canvas-draggable'))}
+function persistCanvasCard(card){const id=card.dataset.widget,p=widgetPrefs[id]||{};const rect=card.getBoundingClientRect(),gridRect=$('dashboardGrid').getBoundingClientRect();p.canvas={x:Math.round((rect.left-gridRect.left)/gridRect.width*1000)/10,y:Math.round((rect.top-gridRect.top)/gridRect.height*1000)/10,w:Math.round(rect.width/gridRect.width*1000)/10,h:Math.round(rect.height/gridRect.height*1000)/10};p.canvas.x=Math.max(0,Math.min(100-p.canvas.w,p.canvas.x));p.canvas.y=Math.max(0,Math.min(100-p.canvas.h,p.canvas.y));widgetPrefs[id]=p;localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyCanvasLayout(true);}
+function initCanvasPointerEvents(){
+ const grid=$('dashboardGrid');if(!grid||grid.dataset.pointerInit)return;grid.dataset.pointerInit='1';
+ grid.addEventListener('pointerdown',e=>{if(!document.body.classList.contains('dashboard-editing'))return;const card=e.target.closest('[data-widget]');if(!card)return;const resize=e.target.closest('.canvas-resize-handle');if(!resize&&e.target.closest('button,input,select,textarea,a'))return;selectCanvasCard(card);const rect=card.getBoundingClientRect(),g=grid.getBoundingClientRect();activePointerEdit={card,mode:resize?'resize':'drag',startX:e.clientX,startY:e.clientY,startLeft:rect.left-g.left,startTop:rect.top-g.top,startWidth:rect.width,startHeight:rect.height,gridWidth:g.width,gridHeight:g.height,moved:false};card.classList.add('canvas-dragging');try{card.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault()});
+ document.addEventListener('pointermove',e=>{if(!activePointerEdit)return;const a=activePointerEdit,dx=e.clientX-a.startX,dy=e.clientY-a.startY;let x=a.startLeft,y=a.startTop,w=a.startWidth,h=a.startHeight;if(a.mode==='drag'){x+=dx;y+=dy}else{w+=dx;h+=dy}const minW=a.gridWidth*.22,minH=a.gridHeight*.09;w=Math.max(minW,Math.min(a.gridWidth,w));h=Math.max(minH,Math.min(a.gridHeight,h));x=Math.max(0,Math.min(a.gridWidth-w,x));y=Math.max(0,Math.min(a.gridHeight-h,y));a.card.style.left=(x/a.gridWidth*100)+'%';a.card.style.top=(y/a.gridHeight*100)+'%';a.card.style.width=(w/a.gridWidth*100)+'%';a.card.style.height=(h/a.gridHeight*100)+'%';if(Math.abs(dx)+Math.abs(dy)>3)a.moved=true});
+ const end=e=>{if(!activePointerEdit)return;const a=activePointerEdit;a.card.classList.remove('canvas-dragging');persistCanvasCard(a.card);activePointerEdit=null};document.addEventListener('pointerup',end);document.addEventListener('pointercancel',end);
+ grid.addEventListener('click',e=>{const card=e.target.closest('[data-widget]');if(card&&document.body.classList.contains('dashboard-editing')&&!e.target.closest('button'))selectCanvasCard(card)});
+}
+initCanvasPointerEvents();
 function setupEditorControls(){
  $('customizeDashboard').onclick=openDashboardEditor;$('closeDashboardEditor').onclick=closeDashboardEditor;
  $('editorDoneLock').onclick=lockScreen;$('lockDashboardBtn').onclick=lockScreen;$('exitDashboardBtn').onclick=exitDashboardFullscreen;
- $('editorWidgetSelect').onchange=loadEditorWidgetForm;
- ['editorWidgetWidth','editorWidgetFont','editorWidgetBg','editorWidgetColor'].forEach(id=>$(id).addEventListener('change',saveEditorWidget));
+ $('editorWidgetSelect').onchange=()=>{loadEditorWidgetForm();document.querySelectorAll('#dashboardGrid [data-widget]').forEach(c=>c.classList.toggle('canvas-selected',c.dataset.widget===$('editorWidgetSelect').value))};
+ ['editorWidgetWidth','editorWidgetFont','editorWidgetBg','editorWidgetColor','editorCustomLabel','editorCustomUnits','editorDecimals','editorOdometer','partShowLabel','partShowValue','partShowSecondary','partShowAverages','partShowBar','partShowScale','partShowExtraBar','editorBarScale','editorBarThickness','editorValueSize','editorLabelSize','editorSecondarySize','editorOffsetX','editorOffsetY'].forEach(id=>$(id).addEventListener(['editorValueSize','editorLabelSize','editorSecondarySize','editorOffsetX','editorOffsetY','editorBarScale','editorBarThickness'].includes(id)?'input':'change',saveEditorWidget));
+ $('editorPositionPart').addEventListener('change',()=>{const p=widgetPrefs[$('editorWidgetSelect').value]||{},off=p.offsets?.[$('editorPositionPart').value]||{x:0,y:0};$('editorOffsetX').value=off.x||0;$('editorOffsetY').value=off.y||0;saveEditorWidget()});
  $('editorWidgetUp').onclick=()=>{ $('widgetSelect').value=$('editorWidgetSelect').value;moveWidget(-1);loadEditorWidgetForm() };
  $('editorWidgetDown').onclick=()=>{ $('widgetSelect').value=$('editorWidgetSelect').value;moveWidget(1);loadEditorWidgetForm() };
  $('editorWidgetHide').onclick=()=>{const id=$('editorWidgetSelect').value;widgetPrefs[id]={...(widgetPrefs[id]||{}),hidden:!(widgetPrefs[id]||{}).hidden,visibilityOverride:true};localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs();applyDashboardLayout();loadEditorWidgetForm();renderWidgetVisibility()};
  $('editorResetLayout').onclick=()=>{widgetPrefs={};localStorage.removeItem('saillabWidgetPrefs');applyDashboardLayout('race');applyWidgetPrefs();loadEditorWidgetForm();toast('Dashboard layout reset')};
- document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&document.body.classList.contains('dashboard-fullscreen')){document.body.classList.remove('cockpit-presentation','dashboard-fullscreen');$('exitDashboardBtn').hidden=true}});
+ $('createCustomWidget').onclick=createCustomWidget; $('deleteCustomWidget').onclick=deleteSelectedCustomWidget; setupCanvasDragHandles();
+ document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&document.body.classList.contains('dashboard-fullscreen')){document.body.classList.remove('cockpit-presentation','dashboard-fullscreen');$('exitDashboardBtn').hidden=true;applyCanvasLayout(false);applyCanvasLayout(false)}});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('dashboard-fullscreen'))exitDashboardFullscreen()});
 }
 function resetWidgetPrefs(){
@@ -244,13 +341,13 @@ async function start(){if(current&&current.status==='recording'){toast('Session 
  else{sessionStartMs=Date.now();paused=false}
  updateControls();requestGps();timerId=setInterval(()=>{if(current&&!paused){$('duration').textContent=fmtTime(elapsed());saveCurrent().catch(console.error)}},5000);toast('Recording started')}
 function requestGps(){if(watchId!==null)return;let fixCount=0;watchId=navigator.geolocation.watchPosition(pos=>{fixCount++;lastFix=pos;const c=pos.coords;const speed=c.speed==null?null:Math.max(0,c.speed*KNOTS_PER_MS);if(Number.isFinite(speed)){sogHistory.push({t:pos.timestamp||Date.now(),value:speed});sogHistory=sogHistory.filter(x=>(Date.now()-x.t)<=60000)}if(Number.isFinite(c.heading)){courseHistory.push({t:pos.timestamp||Date.now(),course:c.heading,accuracy:c.accuracy});courseHistory=courseHistory.filter(x=>Date.now()-x.t<=240000)}const sample={t:pos.timestamp||Date.now(),lat:c.latitude,lon:c.longitude,alt:c.altitude==null?null:c.altitude,accuracy:c.accuracy==null?null:c.accuracy,sog:speed,course:c.heading==null?null:c.heading,heel:correctedMotion('heel'),pitch:correctedMotion('pitch')};if(current&&!paused){samples.push(sample);current.samples=samples;if(samples.length>100000){samples.shift()}if(lastSampleAt){const dt=(sample.t-lastSampleAt)/1000;if(dt>0)$('sampleRate').textContent=(1/dt).toFixed(1)+' Hz effective'}lastSampleAt=sample.t;updateStats();if(activeTack){const prev=activeTack.last;if(prev&&sample.course!=null)activeTack.courseSamples.push(sample.course);activeTack.last=sample;activeTack.distance+=prev?distanceNm(prev,sample):0;activeTack.samples.push(sample)}}
- $('gpsBadge').className='status ok';$('gpsBadge').innerHTML='<span class="dot"></span> GPS active';if($('sog'))$('sog').textContent=speed==null?'—':speed.toFixed(1);if($('course'))$('course').textContent=sample.course==null?'—':Math.round(sample.course);if($('accuracy'))$('accuracy').textContent=sample.accuracy==null?'—':Math.round(sample.accuracy);if($('coords'))$('coords').textContent=`${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)}`;if($('samples'))$('samples').textContent=samples.length;if(typeof updateRaceMetrics==='function')updateRaceMetrics();if(typeof renderCockpit==='function')renderCockpit();},err=>{$('gpsBadge').className='status bad';$('gpsBadge').innerHTML='<span class="dot"></span> GPS unavailable';toast(({1:'GPS permission denied. Check your browser settings.',2:'GPS signal unavailable.',3:'GPS timed out. Try again outdoors.'})[err.code]||'GPS error');if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}if($('settingsGpsToggle'))$('settingsGpsToggle').textContent='Enable GPS'}, {enableHighAccuracy:true,maximumAge:1000,timeout:15000})}
+ $('gpsBadge').className='status ok';$('gpsBadge').innerHTML='<span class="dot"></span> GPS active';if($('sog'))$('sog').textContent=widgetNumber('live-sog',speed,1);if($('course'))$('course').textContent=widgetNumber('live-course',sample.course,0);if($('accuracy'))$('accuracy').textContent=sample.accuracy==null?'—':Math.round(sample.accuracy);if($('coords'))$('coords').textContent=`${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)}`;if($('samples'))$('samples').textContent=samples.length;if(typeof updateRaceMetrics==='function')updateRaceMetrics();if(typeof renderCockpit==='function')renderCockpit();},err=>{$('gpsBadge').className='status bad';$('gpsBadge').innerHTML='<span class="dot"></span> GPS unavailable';toast(({1:'GPS permission denied. Check your browser settings.',2:'GPS signal unavailable.',3:'GPS timed out. Try again outdoors.'})[err.code]||'GPS error');if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}if($('settingsGpsToggle'))$('settingsGpsToggle').textContent='Enable GPS'}, {enableHighAccuracy:true,maximumAge:1000,timeout:15000})}
 function stopGps(){if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}}
 function updateControls(){const active=!!current&&current.status==='recording';$('startBtn').disabled=active;$('pauseBtn').disabled=!active;$('resumeBtn').disabled=!(current&&paused);$('stopBtn').disabled=!current||!['recording','paused'].includes(current.status)}
 async function pause(){if(!current||paused)return;elapsedBeforePause=elapsed();paused=true;sessionStartMs=null;await saveCurrent();updateControls();toast('Session paused')}
 async function resume(){if(!current||!paused)return;sessionStartMs=Date.now();paused=false;await saveCurrent();updateControls();requestGps();toast('Recording resumed')}
 async function finish(){if(!current)return;current.durationMs=elapsed();current.status='finished';current.finishedAt=new Date().toISOString();current={...current,...currentMeta(),samples:[...samples],events:[...events]};await dbPut(current);stopGps();clearInterval(timerId);timerId=null;sessionStartMs=null;paused=false;updateControls();renderSessions();renderAnalysis();toast('Session saved on this device')}
-function updateStats(){const valid=samples.map(s=>s.sog).filter(Number.isFinite);const recent=sogHistory.filter(x=>Date.now()-x.t<=20000).map(x=>x.value);$('avgSpeed').textContent=recent.length?(recent.reduce((a,b)=>a+b,0)/recent.length).toFixed(1):'—';$('maxSpeed').textContent=valid.length?Math.max(...valid).toFixed(1):'—';if($('samples'))$('samples').textContent=samples.length;const liveSog=$('sog');if(liveSog)liveSog.textContent=lastFix?.coords.speed==null?'—':(lastFix.coords.speed*KNOTS_PER_MS).toFixed(1);const duration=$('duration');if(duration)duration.textContent=fmtTime(elapsed())}
+function updateStats(){const valid=samples.map(s=>s.sog).filter(Number.isFinite);const recent=sogHistory.filter(x=>Date.now()-x.t<=20000).map(x=>x.value);$('avgSpeed').textContent=recent.length?widgetNumber('live-sog',recent.reduce((a,b)=>a+b,0)/recent.length,1):'—';$('maxSpeed').textContent=valid.length?widgetNumber('live-sog',Math.max(...valid),1):'—';if($('samples'))$('samples').textContent=samples.length;const liveSog=$('sog');if(liveSog)liveSog.textContent=lastFix?.coords.speed==null?'—':(lastFix.coords.speed*KNOTS_PER_MS).toFixed(1);const duration=$('duration');if(duration)duration.textContent=fmtTime(elapsed())}
 function eventRecord(type,note=''){if(!current){toast('Start a session before logging events');return}const e={id:uid(),type,note,timestamp:new Date().toISOString(),elapsedMs:elapsed(),lat:lastFix?.coords.latitude??null,lon:lastFix?.coords.longitude??null};events.push(e);saveCurrent().catch(console.error);toast(`${type} logged`)}
 function distanceNm(a,b){const rad=x=>x*Math.PI/180;const R=6371000;const dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon),x=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(x))/1852}
 function stats(){const a=samples.map(s=>s.sog).filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return {n:0,mean:null,std:null,median:null};const mean=a.reduce((x,y)=>x+y,0)/a.length;return {n:a.length,mean,std:Math.sqrt(a.reduce((sum,x)=>sum+(x-mean)**2,0)/a.length),median:a.length%2?a[(a.length-1)/2]:(a[a.length/2-1]+a[a.length/2])/2,min:a[0],max:a[a.length-1]}}
@@ -429,19 +526,19 @@ function refreshMaps(){refreshMap('race');refreshMap('dash')}
 function avgWindow(history,seconds){const now=Date.now(),values=history.filter(x=>now-x.t<=seconds*1000).map(x=>x.value).filter(Number.isFinite);return values.length?values.reduce((a,b)=>a+b,0)/values.length:null}
 function renderCockpit(){
  const heel=correctedMotion('heel');
- if($('heel'))$('heel').textContent=heel==null?'—':Math.round(heel);
+ if($('heel'))$('heel').textContent=widgetNumber('live-heel',heel,0);
  const h5=avgWindow(heelHistory,5),h20=avgWindow(heelHistory,20);
- if($('heelAvg5'))$('heelAvg5').textContent=h5==null?'—°':`${h5.toFixed(1)}°`;
- if($('heelAvg20'))$('heelAvg20').textContent=h20==null?'—°':`${h20.toFixed(1)}°`;
+ if($('heelAvg5'))$('heelAvg5').textContent=h5==null?'—°':`${widgetNumber('live-heel',h5,1)}°`;
+ if($('heelAvg20'))$('heelAvg20').textContent=h20==null?'—°':`${widgetNumber('live-heel',h20,1)}°`;
  if($('heelBubble')){const value=Math.max(-16,Math.min(16,heel??0));$('heelBubble').style.left=`${((value+16)/32)*100}%`; $('heelBubble').classList.toggle('unknown',heel==null)}
  const trim=correctedMotion('pitch'),trim5=avgWindow(pitchHistory,5),trim30=avgWindow(pitchHistory,30);
- if($('trimNow'))$('trimNow').textContent=trim==null?'—':trim.toFixed(1);
- if($('trimAvg5'))$('trimAvg5').textContent=trim5==null?'—°':`${trim5.toFixed(1)}°`;
- if($('trimAvg30'))$('trimAvg30').textContent=trim30==null?'—°':`${trim30.toFixed(1)}°`;if($('trimBar')){const tv=Math.max(-4,Math.min(4,trim??0));$('trimBar').style.top=`${((4-tv)/8)*100}%`;$('trimBar').classList.toggle('unknown',trim==null)}
+ if($('trimNow'))$('trimNow').textContent=widgetNumber('trim',trim,1);
+ if($('trimAvg5'))$('trimAvg5').textContent=trim5==null?'—°':`${widgetNumber('trim',trim5,1)}°`;
+ if($('trimAvg30'))$('trimAvg30').textContent=trim30==null?'—°':`${widgetNumber('trim',trim30,1)}°`;if($('trimBar')){const tv=Math.max(-4,Math.min(4,trim??0));$('trimBar').style.top=`${((4-tv)/8)*100}%`;$('trimBar').classList.toggle('unknown',trim==null)}
  if($('trimCount'))$('trimCount').textContent=motion.enabled?'Motion sensor pitch / longitudinal trim':'Enable motion sensors to read trim';
- if($('sog')&&lastFix?.coords.speed!=null)$('sog').textContent=(lastFix.coords.speed*KNOTS_PER_MS).toFixed(1);const recentSog=sogHistory.filter(x=>Date.now()-x.t<=20000).map(x=>x.value);if($('avgSpeed'))$('avgSpeed').textContent=recentSog.length?(recentSog.reduce((a,b)=>a+b,0)/recentSog.length).toFixed(1):'—';
- if($('course'))$('course').textContent=lastFix?.coords.heading==null?'—':Math.round(lastFix.coords.heading);
- updateWind();updateRaceMetrics();refreshMaps();
+ if($('sog'))$('sog').textContent=lastFix?.coords.speed==null?'—':widgetNumber('live-sog',lastFix.coords.speed*KNOTS_PER_MS,1);const recentSog=sogHistory.filter(x=>Date.now()-x.t<=20000).map(x=>x.value);if($('avgSpeed'))$('avgSpeed').textContent=recentSog.length?(recentSog.reduce((a,b)=>a+b,0)/recentSog.length).toFixed(1):'—';
+ if($('course'))$('course').textContent=widgetNumber('live-course',lastFix?.coords.heading??NaN,0);
+ updateWind();updateRaceMetrics();refreshMaps();updateExtraBarValues();renderCustomWidgets();
 }
 function dashboardConfig(){applyWidgetPrefs();const editor=$('dashboardEditor');if(editor)editor.hidden=true}
 function saveDashOrder(){[...$('dashboardGrid').querySelectorAll('[data-widget]')].forEach((el,i)=>{const id=el.dataset.widget;widgetPrefs[id]={...(widgetPrefs[id]||{}),order:i}});localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs()}
@@ -455,7 +552,7 @@ function updateWind(){
  const courseNow=lastFix?.coords.heading;if($('autoWindQuality'))$('autoWindQuality').textContent=autoWindState.quality;if($('dashWindHeading'))$('dashWindHeading').textContent=courseNow==null?'—°':`${Math.round(courseNow)}°`;
  const est=windEstimate();
  if(!est){$('windDirection').textContent='—';$('leftShift').textContent='—';$('rightShift').textContent='—';$('windBaselineLabel').textContent=windBaseline==null?'Baseline not set':`Baseline ${Math.round(windBaseline)}°`;$('windResult').textContent='Need at least 8 accurate GPS course samples across two stable, distinct courses. The automatic estimate refreshes every 20 seconds.';if($('autoWindQuality'))$('autoWindQuality').textContent=autoWindState.quality;if($('dashWindShift')){$('dashWindShift').textContent='—';$('dashWindLabel').textContent='WAITING FOR GPS';$('dashTrueWindDirection').textContent='—°'}renderWindShiftLeds(null,'unknown');return}
- $('windDirection').textContent=String(Math.round(est.direction)).padStart(3,'0');$('windNeedle').style.transform=`rotate(${est.direction}deg)`;$('windBaselineLabel').textContent=windBaseline==null?'Baseline not set':`Baseline ${Math.round(windBaseline)}°`;
+ $('windDirection').textContent=widgetNumber('wind-detail',est.direction,0).padStart(3,'0');$('windNeedle').style.transform=`rotate(${est.direction}deg)`;$('windBaselineLabel').textContent=windBaseline==null?'Baseline not set':`Baseline ${Math.round(windBaseline)}°`;
  const delta=est.delta;const rel=courseNow==null?null:angularDelta(est.direction,courseNow);const tackSide=rel==null||Math.abs(rel)<8?'unknown':rel>0?'starboard':'port';const lift=delta!=null&&tackSide!=='unknown'&&((tackSide==='starboard'&&delta<0)||(tackSide==='port'&&delta>0));$('leftShift').textContent=delta==null?'—':`${delta<0?Math.abs(delta).toFixed(0)+'°':'0°'}`;$('rightShift').textContent=delta==null?'—':`${delta>0?delta.toFixed(0)+'°':'0°'}`;
  $('windResult').textContent=delta==null?'Estimated direction available. Set a baseline to compare future shifts.':delta>0?`RIGHT SHIFT: estimated wind direction has moved ${delta.toFixed(1)}° clockwise from baseline.`:delta<0?`LEFT SHIFT: estimated wind direction has moved ${Math.abs(delta).toFixed(1)}° counter-clockwise from baseline.`:'Wind direction is unchanged from baseline.';if($('autoWindQuality'))$('autoWindQuality').textContent=autoWindState.quality;
  if($('dashWindShift')){$('dashWindShift').textContent=delta==null?'—':`${Math.abs(delta).toFixed(0)}°`;$('dashWindLabel').textContent=delta==null?'SET BASELINE':Math.abs(delta)<1?'NO SHIFT':tackSide==='unknown'?'SHIFT':lift?'LIFT':'HEADER';$('dashTrueWindDirection').textContent=`${Math.round(est.direction)}°`}
@@ -476,7 +573,8 @@ function applyDashboardLayout(layout){
  if(layout||!cards.some(card=>widgetPrefs[card.dataset.widget]?.order!==undefined)){defaultOrder.forEach((id,i)=>{const card=grid.querySelector(`[data-widget="${id}"]`);if(card){grid.appendChild(card);widgetPrefs[id]={...(widgetPrefs[id]||{}),order:i}}});localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));}
  else cards.sort((a,b)=>(widgetPrefs[a.dataset.widget]?.order??100)-(widgetPrefs[b.dataset.widget]?.order??100)).forEach(card=>grid.appendChild(card));
  grid.querySelectorAll('[data-widget]').forEach(card=>{const id=card.dataset.widget,p=widgetPrefs[id]||{};let full=(chosen==='race'&&id==='wind-detail')||(chosen==='minimal'&&id==='wind-detail');if(p.width&&!layout)full=p.width==='full';card.classList.toggle('widget-full',full);card.classList.toggle('dash-wide',full);card.classList.toggle('widget-hidden',p.hidden===true||(chosen==='minimal'&&id==='trim'&&p.visibilityOverride!==true));});
- if(layout){localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));renderWidgetVisibility();}
+ if(layout){localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));renderWidgetVisibility();if(document.body.classList.contains('dashboard-editing')||document.body.classList.contains('dashboard-fullscreen'))applyCanvasLayout(true,true);}
+ else if(document.body.classList.contains('dashboard-editing')||document.body.classList.contains('dashboard-fullscreen'))applyCanvasLayout(true);
 }
 function setupLayoutControls(){document.querySelectorAll('[data-layout]').forEach(b=>b.addEventListener('click',()=>applyDashboardLayout(b.dataset.layout)));if($('dashboardLayout'))$('dashboardLayout').addEventListener('change',e=>applyDashboardLayout(e.target.value));}
 
@@ -505,7 +603,7 @@ async function saveFlag(){const ev={id:uid(),type:'Flag',timestamp:new Date().to
 function initFlagControls(){if($('flagMomentBtn'))$('flagMomentBtn').onclick=showFlagEditor;$('closeFlagEditor').onclick=()=>$('flagEditor').hidden=true;$('saveFlagBtn').onclick=()=>saveFlag().catch(e=>toast('Could not save flag: '+e.message));$('flagPhotoInput').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{flagPhotoData=await compressPhoto(f);$('flagPhotoPreview').innerHTML='';const img=document.createElement('img');img.src=flagPhotoData;img.alt='Flag preview';$('flagPhotoPreview').append(img)}catch(err){toast('Could not load photo')}}}
 function initRaceFeature(){updateRaceEndpoints();$('gunSeconds').value=localStorage.getItem('saillabGunSeconds')||'300';$('pingCommittee').onclick=()=>pingEndpoint('committee');$('pingPin').onclick=()=>pingEndpoint('pin');$('pingUpwind').onclick=()=>pingEndpoint('upwind');$('gunStart').onclick=startGunCountdown;$('gunSync').onclick=syncGunToMinute;$('gunMinusMinute').onclick=()=>adjustGunMinutes(-1);$('gunPlusMinute').onclick=()=>adjustGunMinutes(1);$('gunReset').onclick=resetGunCountdown;$('centerRaceMap').onclick=()=>{if(raceMap){const pts=[currentPoint(),raceMarks.committee,raceMarks.pin,raceMarks.upwind].filter(Boolean).map(x=>[x.lat,x.lon]);if(pts.length)raceMap.fitBounds(pts,{padding:[25,25],maxZoom:16})}};$('dashboardRaceBtn')&&($('dashboardRaceBtn').onclick=()=>showView('race'));$('widgetSelect').onchange=loadWidgetForm;$('widgetWidth').onchange=saveSelectedWidget;$('widgetFont').onchange=saveSelectedWidget;$('widgetBg').onchange=saveSelectedWidget;$('widgetColor').onchange=saveSelectedWidget;$('widgetUp').onclick=()=>moveWidget(-1);$('widgetDown').onclick=()=>moveWidget(1);$('widgetHide').onclick=()=>{const id=$('widgetSelect').value;widgetPrefs[id]={...(widgetPrefs[id]||{}),hidden:!(widgetPrefs[id]?.hidden)};localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs()};$('widgetReset').onclick=()=>{widgetPrefs={};localStorage.removeItem('saillabWidgetPrefs');applyWidgetPrefs();applyDashboardLayout('race');toast('Dashboard reset')};$('logTrim').onclick=logTrim;$('setWindBaseline').onclick=()=>{const w=windEstimate();if(!w){toast('Need more stable GPS course data first');return}windBaseline=w.direction;localStorage.setItem('saillabWindBaseline',JSON.stringify(windBaseline));updateWind();renderCockpit();toast('Wind baseline set')};$('resetWindData').onclick=()=>{if(!confirm('Clear saved port/starboard legs and the wind-shift baseline?'))return;windBaseline=null;tackSegments={port:[],starboard:[]};localStorage.removeItem('saillabWindBaseline');localStorage.removeItem('saillabWindLegMeans');updateWind();renderCockpit();toast('Wind legs and baseline cleared')};
  $('portTack').onclick=()=>{markTack('port')};$('starboardTack').onclick=()=>{markTack('starboard')};if($('cockpitPortTack'))$('cockpitPortTack').onclick=()=>markTack('port');if($('cockpitStarboardTack'))$('cockpitStarboardTack').onclick=()=>markTack('starboard');
- initFlagControls();dashboardConfig();setupLayoutControls();setupEditorControls();setupQuickPhoneEditor();applyDashboardLayout();
+ initFlagControls();initCustomWidgets();dashboardConfig();setupLayoutControls();setupEditorControls();applyDashboardLayout();setInterval(renderCustomWidgets,1000);
 }
 const originalShowView=showView;
 showView=function(name){originalShowView(name);if(name==='race'){if(!raceMap&&typeof L!=='undefined')initMap('raceMap','race');setTimeout(()=>raceMap?.invalidateSize(),80);refreshMap('race')}if(name==='cockpit'){if(!dashMap&&typeof L!=='undefined')initMap('dashboardMap','dash');setTimeout(()=>dashMap?.invalidateSize(),80);refreshMap('dash');renderCockpit()}if(name==='wind'){setTimeout(()=>{},0);return}};

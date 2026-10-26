@@ -31,5 +31,10 @@ Tap **Flag** on Dashboard to save the timestamp and GPS position, with an option
 Version 8 notes: Dashboard appearance has moved to Dashboard itself. Lock screen requests GPS and motion sensors, shows selected widgets full-screen, and unlocks with a long press (about 1.8 seconds). EWD is an approximate GPS-course-based estimate updated every 20 seconds, not a true-wind sensor. The Flag button saves timestamp/position with optional note/photo; Start supports pinging the upwind mark.
 
 
-## Interactive phone layout editor (v10)
-Open Dashboard → Appearance. In the phone-shaped preview, tap any widget to select it, then use the on-phone controls to move it, switch half/full width, increase or decrease its text size, hide/show it, or apply a quick card colour. The editor works by touch and does not require drag-and-drop. Detailed colour and text controls remain available in Appearance. Your layout is saved locally on this device.
+## Widget customisation (v11)
+The Dashboard Appearance editor now supports per-widget value/label/secondary font sizes, decimal precision, moving selected elements with X/Y offsets, resizing gauge bars, toggling widget parts and scales, adding an optional secondary indicator bar, and an odometer-style SOG display. Preferences are saved locally in the browser.
+
+
+## Version 12 — Free-position dashboard editor
+
+The Dashboard Appearance editor now includes a phone-shaped 9:20 canvas approximating the Samsung Galaxy S21 Ultra portrait screen. In edit mode, drag widgets by touching and moving the card, and resize using the lower-right handle. Positions and dimensions are saved locally and reused in full-screen presentation. Create custom widgets from available live data sources (SOG, COG, HEEL, TRIM, estimated wind direction, elapsed clock, GPS accuracy), choose number/bar/odometer presentation, then edit label, units, precision, colours, type sizes, visibility and bar options. Custom widgets are stored locally in this browser.

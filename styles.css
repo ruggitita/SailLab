@@ -202,15 +202,86 @@ body.dashboard-fullscreen #dashboardGrid .ewd-card .ios-value{font-size:clamp(56
 @media(max-width:420px){.ios-dashboard .ios-card{min-height:clamp(155px,22vh,205px);padding:11px;gap:7px}.ios-dashboard .sog-card .ios-value{font-size:clamp(68px,19vw,92px)!important}.ios-dashboard .cog-card .ios-value{font-size:clamp(56px,15vw,76px)!important}.trim-gauge-wrap,.trim-track.vertical-trim-track{min-height:84px}.eight-leds .wind-led{height:12px}}
 
 
-/* SailLab v10: phone-first interactive editor. No drag-and-drop required. */
-.phone-quick-editor{margin:0 0 10px;padding:9px;border:1px solid #3b7c6b;border-radius:16px;background:linear-gradient(145deg,#132d31,#101f2e);color:#f1f6fa;display:grid;gap:8px}
-.phone-quick-editor[hidden]{display:none!important}
-.quick-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px}.quick-editor-heading strong{font-size:12px}.quick-editor-heading span{font-size:9px;color:#9fb7c1}
-.quick-editor-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.quick-editor-actions button{min-width:0;min-height:38px;padding:6px 4px;border-radius:10px;font-size:10px;touch-action:manipulation}.quick-editor-actions button:disabled{opacity:.35}
-.quick-color-row{display:flex;align-items:center;gap:8px;min-height:28px}.quick-color-row span{font-size:9px;color:#9fb7c1;margin-right:auto}.quick-color-row button{width:25px;height:25px;min-width:25px;min-height:25px;padding:0;border-radius:50%;border:2px solid #ffffff80;background:var(--swatch,#273849);touch-action:manipulation}.quick-color-row button:not([data-quick-bg]){background:#253746;color:white;font-size:13px}
-body.dashboard-editing #dashboardGrid [data-widget]{cursor:pointer;touch-action:manipulation;outline:1px solid #ffffff20;transition:outline .15s,transform .15s}
-body.dashboard-editing #dashboardGrid [data-widget].quick-selected{outline:3px solid #5ce0bd;box-shadow:0 0 0 4px #5ce0bd24,0 8px 22px #0006;transform:scale(.985)}
-body.dashboard-editing #dashboardGrid [data-widget].widget-hidden{display:flex!important;opacity:.38;filter:grayscale(.75);border-style:dashed;position:relative}
-body.dashboard-editing #dashboardGrid [data-widget].widget-hidden::after{content:'HIDDEN · TAP SHOW';position:absolute;inset:auto 6px 6px;text-align:center;font-size:8px;letter-spacing:.08em;font-weight:900;color:#fff;background:#263744e8;border-radius:7px;padding:5px;pointer-events:none}
-body.dashboard-editing .dashboard-grid{max-height:none;overflow:visible}
-@media(max-width:420px){.quick-editor-actions{gap:4px}.quick-editor-actions button{font-size:9px;min-height:36px}.quick-color-row{gap:7px}}
+/* SailLab v11: granular per-widget editing controls and component layout. */
+.widget-fine-tuning{margin:12px 0;padding:12px;border:1px solid #2e4d5c;background:#0b1a27;border-radius:14px}
+.widget-fine-tuning h4{margin:0 0 12px;font-size:13px}
+.widget-fine-tuning label{font-size:11px!important;line-height:1.35;gap:6px}
+.widget-fine-tuning output{float:right;color:#62d9bd;font-weight:800;font-variant-numeric:tabular-nums}
+.widget-fine-tuning input[type=range]{width:100%;accent-color:#62d9bd;min-height:26px;padding:0}
+.widget-fine-tuning select{font-size:12px;min-height:38px}
+.widget-toggle-option{display:flex!important;flex-direction:row!important;align-items:center;gap:8px!important;padding:10px;border:1px solid var(--line);border-radius:10px}
+.widget-toggle-option input,.widget-part-toggles input{width:16px;height:16px;accent-color:#62d9bd}
+.widget-part-toggles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0}
+.widget-part-toggles label{display:flex!important;align-items:center;flex-direction:row!important;gap:7px!important;padding:9px 8px;border:1px solid var(--line);border-radius:10px;background:#132331;margin:0!important}
+.custom-part-hidden{display:none!important}
+.ios-dashboard .ios-card .ios-value{font-size:var(--custom-value-size,clamp(58px,16vw,88px))!important}
+.ios-dashboard .ios-card .metric-label,.ios-dashboard .ios-card .metric-label small{font-size:var(--custom-label-size,9px)!important}
+.ios-dashboard .ios-card .ios-foot,.ios-dashboard .ios-card .ewd-shift-status,.ios-dashboard .ios-card .average-pair small{font-size:var(--custom-secondary-size,10px)!important}
+.ios-dashboard .ios-card .average-pair strong{font-size:calc(var(--custom-secondary-size,10px) * 1.8)!important}
+.ios-dashboard .ios-card .heel-track{height:var(--custom-bar-thickness,12px)!important}
+.ios-dashboard .ios-card .trim-track.vertical-trim-track{width:var(--custom-bar-thickness,12px)!important}
+.ios-dashboard .ios-card .trim-track.vertical-trim-track .trim-bar{width:calc(var(--custom-bar-thickness,12px) * 2.5)!important}
+.ios-dashboard .ios-card .ewd-shift-line .wind-led{height:var(--custom-bar-thickness,12px)!important}
+.custom-extra-bar{height:var(--extra-thickness,12px);min-height:4px;width:100%;border-radius:999px;overflow:hidden;background:#263b4b;position:relative;flex:0 0 auto}
+.custom-extra-bar:before{content:"";display:block;height:100%;width:var(--bar-progress,0%);border-radius:inherit;background:linear-gradient(90deg,#267dff 0%,#5ce0bd 55%,#ff5b5b 100%);transition:width .2s ease}
+.custom-extra-bar.unknown:before{opacity:.25}
+.ios-card.odometer-mode .ios-value>span{display:inline-block;padding:.04em .12em;border-radius:.12em;background:linear-gradient(180deg,#07111a,#1b2d3b);border:1px solid #567084;color:#f4fbff;text-shadow:0 0 12px #5ce0bd44;box-shadow:inset 0 1px 4px #0008;font-variant-numeric:tabular-nums;letter-spacing:.015em!important}
+body.dashboard-editing .ios-card.odometer-mode .ios-value>span{padding:.03em .08em}
+@media(max-width:420px){.widget-fine-tuning{padding:9px}.widget-part-toggles{gap:5px}.widget-part-toggles label{padding:7px 5px;font-size:10px!important}}
+
+/* SailLab v12 — real phone canvas, touch drag/resize, and user-created instruments. */
+body.dashboard-editing .dashboard-phone-frame.phone-canvas-active{width:min(100%,330px);height:auto;aspect-ratio:9/20;min-height:0;margin:18px auto 26px;padding:0;box-sizing:border-box;border:6px solid #526171;border-radius:34px;background:#050b12;box-shadow:0 0 0 5px #172432,0 18px 42px #0008;overflow:hidden;touch-action:pan-y}
+body.dashboard-editing .dashboard-phone-frame.phone-canvas-active .phone-preview-label{display:none!important}
+body.dashboard-editing .dashboard-grid.free-position-canvas{position:absolute;inset:0;display:block;width:100%;height:100%;max-height:none;min-height:0;overflow:hidden;padding:0;margin:0;gap:0;touch-action:none}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget]{box-sizing:border-box;min-width:0;min-height:0;max-width:none;max-height:none;margin:0;overflow:hidden;gap:clamp(2px,1.2vw,7px);padding:clamp(4px,1.6vw,10px);border-radius:clamp(9px,3.2vw,18px);outline:1px solid #ffffff22;transition:outline-color .12s,box-shadow .12s}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget].canvas-selected{outline:2px solid #5ce0bd;box-shadow:0 0 0 2px #5ce0bd44,0 5px 16px #0007;z-index:90!important}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget].canvas-dragging{opacity:.9;outline:2px dashed #ffca70;box-shadow:0 8px 25px #0009;z-index:100!important}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .ios-card-head{min-height:0;gap:4px}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .ios-symbol{width:clamp(15px,5vw,25px);height:clamp(15px,5vw,25px);border-radius:6px;font-size:10px;flex:0 0 auto}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .ios-value{font-size:var(--custom-value-size,clamp(22px,7vw,42px));line-height:.98;min-width:0;overflow-wrap:anywhere}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .metric-label{font-size:var(--custom-label-size,8px);line-height:1.1;overflow-wrap:anywhere}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .ios-foot,body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .average-pair small{font-size:var(--custom-secondary-size,8px);line-height:1.15}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .average-pair{gap:3px;margin-top:0}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .average-pair>div{padding:3px 4px;border-radius:6px}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .average-pair strong{font-size:clamp(12px,4vw,20px);margin-top:2px}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .heel-track{height:var(--custom-bar-thickness,8px)}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .trim-gauge-wrap{display:flex;flex:1;min-height:0;align-items:stretch;justify-content:center}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .trim-track{height:100%;min-height:35px;width:var(--custom-bar-thickness,12px);margin:0 auto}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .trim-scale{font-size:7px;gap:3px}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .ewd-shift-line{grid-template-columns:auto minmax(0,1fr) auto;gap:3px;font-size:6px}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .ewd-controls{margin-top:auto;gap:3px}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] .ewd-controls button{min-height:23px;padding:3px 2px;font-size:7px;border-radius:6px}
+.canvas-resize-handle{position:absolute!important;right:2px;bottom:2px;z-index:120;width:25px;height:25px;min-height:25px;padding:0!important;border:1px solid #ffffff90!important;border-radius:7px!important;background:#5ce0bd!important;color:#071b1c!important;font-size:16px!important;font-weight:900;line-height:1;display:none;touch-action:none;box-shadow:0 2px 6px #0007}
+body.dashboard-editing .canvas-resize-handle{display:grid;place-items:center}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget]{touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+body.dashboard-editing .dashboard-grid.free-position-canvas>[data-widget] button{touch-action:manipulation}
+.custom-widget-builder{margin:12px 0;padding:12px;border-radius:15px;border-color:#294d60;background:#0d202c}
+.custom-widget-builder h4{margin:0 0 10px;font-size:13px}
+.custom-widget-builder input,.custom-widget-builder select{min-width:0}
+.custom-widget-builder>button{width:100%;margin-top:8px}
+.custom-metric-card .custom-symbol{background:#5ce0bd22;color:#5ce0bd}
+.custom-metric-card .custom-widget-meter{height:var(--custom-bar-thickness,10px);width:100%;border-radius:999px;background:color-mix(in srgb,var(--muted) 24%,transparent);overflow:hidden;margin-top:auto;flex:0 0 auto}
+.custom-metric-card .custom-widget-meter span{display:block;height:100%;width:0;border-radius:inherit;background:var(--accent);transition:width .18s ease}
+.custom-metric-card.odometer-mode .custom-main-value{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.03em;background:#0002;border-radius:7px;padding:3px 5px}
+.custom-part-hidden{display:none!important}
+body.dashboard-fullscreen .dashboard-phone-frame.phone-canvas-active{width:100%;height:100%;aspect-ratio:auto;max-width:none;min-height:0;padding:0;border:0;border-radius:0;margin:0;box-shadow:none;overflow:hidden}
+body.dashboard-fullscreen #dashboardGrid.free-position-canvas{position:absolute;inset:0;width:100%;height:100%;min-height:0;max-height:none;display:block;overflow:hidden;padding:0;margin:0;gap:0}
+body.dashboard-fullscreen #dashboardGrid.free-position-canvas>[data-widget]{position:absolute!important;min-width:0;min-height:0;max-width:none;max-height:none;margin:0;overflow:hidden;padding:clamp(5px,1.7vw,16px);border-radius:clamp(9px,2.5vw,22px);gap:clamp(3px,1vw,9px)}
+body.dashboard-fullscreen #dashboardGrid.free-position-canvas .canvas-resize-handle{display:none!important}
+body.dashboard-fullscreen #dashboardGrid.free-position-canvas .ios-value{font-size:var(--custom-value-size,clamp(28px,8vw,100px))!important}
+body.dashboard-fullscreen #dashboardGrid.free-position-canvas .metric-label{font-size:var(--custom-label-size,clamp(7px,1.6vw,12px))!important}
+body.dashboard-fullscreen #dashboardGrid.free-position-canvas .ios-foot,body.dashboard-fullscreen #dashboardGrid.free-position-canvas .average-pair small{font-size:var(--custom-secondary-size,clamp(7px,1.5vw,12px))!important}
+body.dashboard-fullscreen #dashboardGrid.free-position-canvas .trim-gauge-wrap{display:flex;flex:1;min-height:0;align-items:stretch;justify-content:center}
+body.dashboard-fullscreen #dashboardGrid.free-position-canvas .trim-track{height:100%;min-height:30px;width:var(--custom-bar-thickness,14px)}
+body.dashboard-fullscreen #dashboardGrid.free-position-canvas .heel-track{height:var(--custom-bar-thickness,12px)}
+@media(max-width:370px){body.dashboard-editing .dashboard-phone-frame.phone-canvas-active{width:min(100%,300px)}.canvas-resize-handle{width:22px;height:22px;min-height:22px}}
+body.dashboard-fullscreen #view-cockpit{height:100%;min-height:0;overflow:hidden}
+
+body.dashboard-editing #view-cockpit{display:flex;flex-direction:column;gap:8px}
+body.dashboard-editing #view-cockpit>.section-head{order:0}
+body.dashboard-editing #view-cockpit>.dashboard-presets{order:1}
+body.dashboard-editing #view-cockpit>.dashboard-phone-frame{order:2}
+body.dashboard-editing #view-cockpit>.dashboard-editor{order:3}
+body.dashboard-editing #view-cockpit>.flag-editor{order:4}
+body.dashboard-editing #view-cockpit>.dashboard-phone-frame{flex:0 0 auto}
+body.dashboard-editing #view-cockpit>.dashboard-editor{width:100%;box-sizing:border-box}
