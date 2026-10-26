@@ -45,5 +45,9 @@ A web PWA cannot force Android to launch or reopen itself automatically when the
 ### Version 8 implementation notes
 - Dashboard Appearance is now directly on the Dashboard; choose widget visibility, size, order, text size, card/text colours and one of eight themes.
 - Lock screen opens a full-screen, touch-blocking instrument display. Long-press for about 1.8 seconds to unlock. The app requests GPS and motion sensor access when entering lock mode; browser permissions may still need to be granted.
-- EWD attempts an automatic course-cluster/bisector estimate from accurate GPS COG samples and refreshes every 20 seconds. The four LEDs indicate a provisional lift/header only when a current tack side can be inferred. This is a heuristic estimate, not instrument-grade true wind.
+- EWD attempts an automatic course-cluster/bisector estimate from accurate GPS COG samples and refreshes every 20 seconds. The eight LED sectors indicate a provisional lift/header only when a current tack side can be inferred. This is a heuristic estimate, not instrument-grade true wind.
 - Dashboard Flag saves timestamp, last GPS position and optional note/photo locally. Ping Upwind Mark adds a waypoint and a dashed leg from the start-line midpoint on the race map.
+
+
+## Interactive phone layout editor (v10)
+Open Dashboard → Appearance. In the phone-shaped preview, tap any widget to select it, then use the on-phone controls to move it, switch half/full width, increase or decrease its text size, hide/show it, or apply a quick card colour. The editor works by touch and does not require drag-and-drop. Detailed colour and text controls remain available in Appearance. Your layout is saved locally on this device.

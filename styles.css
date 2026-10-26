@@ -169,3 +169,48 @@ body.dashboard-fullscreen .dashboard-actions,body.dashboard-fullscreen #flagEdit
 body.app-locked #exitDashboardBtn{display:none!important}body.dashboard-fullscreen #view-cockpit>.section-head{display:none!important}
 .ios-dashboard[data-layout="minimal"] .trim-card:not(.widget-hidden){display:flex!important}
 body.dashboard-fullscreen #dashboardGrid .ewd-controls{display:none!important}
+
+/* SailLab v9: bigger numeric hierarchy, filled cards, vertical trim, eight EWD sectors. */
+.ios-dashboard .ios-card{min-height:clamp(172px,24vh,240px);height:100%;justify-content:space-between;gap:clamp(6px,1.4vh,12px);padding:clamp(12px,3vw,19px)}
+.ios-dashboard .ios-card .ios-card-head{min-height:16px;flex:0 0 auto}
+.ios-dashboard .ios-card .metric-label{font-size:8px!important;letter-spacing:.1em!important}
+.ios-dashboard .ios-card .metric-label small{font-size:8px!important}
+.ios-dashboard .ios-value{flex:1;display:flex;align-items:center;min-height:68px;font-size:clamp(58px,16vw,88px)!important;line-height:.9;letter-spacing:-.07em!important}
+.ios-dashboard .sog-card .ios-value{font-size:clamp(72px,20vw,108px)!important;color:#5ce0bd}
+.ios-dashboard .cog-card .ios-value{font-size:clamp(58px,16vw,88px)!important;color:#68c9ff}
+.ios-dashboard .heel-card .ios-value,.ios-dashboard .trim-card .ios-value{font-size:clamp(56px,15vw,82px)!important}
+.ios-dashboard .ios-foot{font-size:9px;line-height:1.25}
+.ios-dashboard .sog-card .ios-card-head,.ios-dashboard .cog-card .ios-card-head{margin-bottom:0}
+.trim-gauge-wrap{display:flex;align-items:stretch;justify-content:center;gap:9px;flex:1;min-height:94px;margin:2px 0}
+.trim-scale{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;font-size:9px;line-height:1;color:var(--muted);margin:0;padding:2px 0}
+.trim-track.vertical-trim-track{position:relative;flex:1;min-width:20px;max-width:40px;width:28px;height:auto;min-height:94px;border-radius:999px;background:linear-gradient(180deg,#ff3b45 0%,#ff756b 22%,#7baeff 40%,#267dff 50%,#7baeff 60%,#ff756b 78%,#ff3b45 100%);box-shadow:inset 0 1px 3px #0005}
+.vertical-trim-track .trim-center-line{left:-3px;right:-3px;top:50%;bottom:auto;width:auto;height:2px;background:#fff;opacity:.9}
+.vertical-trim-track .trim-bar{left:50%;top:50%;height:7px;width:24px;max-width:calc(100% + 8px);border:2px solid #fff;border-radius:999px;background:#267dff;transform:translate(-50%,-50%);transition:top .12s ease}
+.vertical-trim-track .trim-bar.unknown{left:50%!important;top:50%!important}
+.trim-card .average-pair{flex:0 0 auto}
+.eight-leds{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:clamp(2px,.8vw,5px);width:100%;min-width:0}
+.eight-leds .wind-led{height:clamp(12px,2.4vh,18px);min-width:0;border-radius:4px;background:color-mix(in srgb,var(--muted) 18%,transparent);border:1px solid color-mix(in srgb,var(--muted) 22%,transparent)}
+.eight-leds .wind-led.left.on{background:#59b9ff;border-color:#80ceff;box-shadow:0 0 10px #59b9ff65}
+.eight-leds .wind-led.right.on{background:#ffbd59;border-color:#ffda91;box-shadow:0 0 10px #ffbd5965}
+.ewd-card .ios-value{font-size:clamp(54px,14vw,78px)!important;min-height:54px}
+body.dashboard-fullscreen #dashboardGrid .ios-card{min-height:0;height:100%;justify-content:space-between;gap:clamp(5px,1.2vh,10px);padding:clamp(9px,2.6vw,16px)}
+body.dashboard-fullscreen #dashboardGrid .sog-card .ios-value{font-size:clamp(78px,22vw,118px)!important;min-height:0}
+body.dashboard-fullscreen #dashboardGrid .cog-card .ios-value{font-size:clamp(62px,17vw,94px)!important;min-height:0}
+body.dashboard-fullscreen #dashboardGrid .heel-card .ios-value,body.dashboard-fullscreen #dashboardGrid .trim-card .ios-value{font-size:clamp(58px,16vw,90px)!important;min-height:0}
+body.dashboard-fullscreen #dashboardGrid .trim-gauge-wrap,body.dashboard-fullscreen #dashboardGrid .trim-track.vertical-trim-track{min-height:clamp(72px,12vh,130px)}
+body.dashboard-fullscreen #dashboardGrid .ewd-card .ios-value{font-size:clamp(56px,15vw,84px)!important;min-height:0}
+@media(max-width:420px){.ios-dashboard .ios-card{min-height:clamp(155px,22vh,205px);padding:11px;gap:7px}.ios-dashboard .sog-card .ios-value{font-size:clamp(68px,19vw,92px)!important}.ios-dashboard .cog-card .ios-value{font-size:clamp(56px,15vw,76px)!important}.trim-gauge-wrap,.trim-track.vertical-trim-track{min-height:84px}.eight-leds .wind-led{height:12px}}
+
+
+/* SailLab v10: phone-first interactive editor. No drag-and-drop required. */
+.phone-quick-editor{margin:0 0 10px;padding:9px;border:1px solid #3b7c6b;border-radius:16px;background:linear-gradient(145deg,#132d31,#101f2e);color:#f1f6fa;display:grid;gap:8px}
+.phone-quick-editor[hidden]{display:none!important}
+.quick-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px}.quick-editor-heading strong{font-size:12px}.quick-editor-heading span{font-size:9px;color:#9fb7c1}
+.quick-editor-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.quick-editor-actions button{min-width:0;min-height:38px;padding:6px 4px;border-radius:10px;font-size:10px;touch-action:manipulation}.quick-editor-actions button:disabled{opacity:.35}
+.quick-color-row{display:flex;align-items:center;gap:8px;min-height:28px}.quick-color-row span{font-size:9px;color:#9fb7c1;margin-right:auto}.quick-color-row button{width:25px;height:25px;min-width:25px;min-height:25px;padding:0;border-radius:50%;border:2px solid #ffffff80;background:var(--swatch,#273849);touch-action:manipulation}.quick-color-row button:not([data-quick-bg]){background:#253746;color:white;font-size:13px}
+body.dashboard-editing #dashboardGrid [data-widget]{cursor:pointer;touch-action:manipulation;outline:1px solid #ffffff20;transition:outline .15s,transform .15s}
+body.dashboard-editing #dashboardGrid [data-widget].quick-selected{outline:3px solid #5ce0bd;box-shadow:0 0 0 4px #5ce0bd24,0 8px 22px #0006;transform:scale(.985)}
+body.dashboard-editing #dashboardGrid [data-widget].widget-hidden{display:flex!important;opacity:.38;filter:grayscale(.75);border-style:dashed;position:relative}
+body.dashboard-editing #dashboardGrid [data-widget].widget-hidden::after{content:'HIDDEN · TAP SHOW';position:absolute;inset:auto 6px 6px;text-align:center;font-size:8px;letter-spacing:.08em;font-weight:900;color:#fff;background:#263744e8;border-radius:7px;padding:5px;pointer-events:none}
+body.dashboard-editing .dashboard-grid{max-height:none;overflow:visible}
+@media(max-width:420px){.quick-editor-actions{gap:4px}.quick-editor-actions button{font-size:9px;min-height:36px}.quick-color-row{gap:7px}}

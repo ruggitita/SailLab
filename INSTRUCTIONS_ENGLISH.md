@@ -29,3 +29,7 @@ Important Android limitation: a web app cannot force Android to open SailLab aut
 Tap **Flag** on Dashboard to save the timestamp and GPS position, with an optional note and photo. On Start, use **Ping upwind mark** to add the windward mark to the race map. Line-length coverage time is estimated from the current SOG.
 
 Version 8 notes: Dashboard appearance has moved to Dashboard itself. Lock screen requests GPS and motion sensors, shows selected widgets full-screen, and unlocks with a long press (about 1.8 seconds). EWD is an approximate GPS-course-based estimate updated every 20 seconds, not a true-wind sensor. The Flag button saves timestamp/position with optional note/photo; Start supports pinging the upwind mark.
+
+
+## Interactive phone layout editor (v10)
+Open Dashboard → Appearance. In the phone-shaped preview, tap any widget to select it, then use the on-phone controls to move it, switch half/full width, increase or decrease its text size, hide/show it, or apply a quick card colour. The editor works by touch and does not require drag-and-drop. Detailed colour and text controls remain available in Appearance. Your layout is saved locally on this device.

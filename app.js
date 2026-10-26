@@ -8,6 +8,7 @@ let savedFlags=JSON.parse(localStorage.getItem('saillabFlags')||'[]');
 let flagPhotoData=null;
 let zeroOffsets=JSON.parse(localStorage.getItem('saillabZeroOffsets')||'{"heel":0,"pitch":0}');
 let widgetPrefs=JSON.parse(localStorage.getItem('saillabWidgetPrefs')||'{}');
+let quickSelectedWidget='live-sog';
 let wakeLock=null, locked=false, unlockHoldTimer=null;
 const KNOTS_PER_MS=1.943844;
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2600)}
@@ -165,11 +166,11 @@ function saveEditorWidget(){
 }
 function openDashboardEditor(){
  if(locked)unlockScreen();
- $('dashboardEditor').hidden=false;document.body.classList.add('dashboard-editing');
- loadEditorWidgetForm();renderWidgetVisibility();$('dashboardEditor').scrollIntoView({behavior:'smooth',block:'start'});
+ $('dashboardEditor').hidden=false;$('phoneQuickEditor').hidden=false;document.body.classList.add('dashboard-editing');
+ loadEditorWidgetForm();renderWidgetVisibility();selectQuickWidget($('editorWidgetSelect').value||quickSelectedWidget);$('dashboardEditor').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function closeDashboardEditor(){
- $('dashboardEditor').hidden=true;document.body.classList.remove('dashboard-editing');
+ $('dashboardEditor').hidden=true;$('phoneQuickEditor').hidden=true;document.body.classList.remove('dashboard-editing');document.querySelectorAll('#dashboardGrid [data-widget]').forEach(el=>el.classList.remove('quick-selected'));
 }
 async function enterDashboardFullscreen(){
  closeDashboardEditor();
@@ -183,6 +184,37 @@ async function exitDashboardFullscreen(){
  document.body.classList.remove('cockpit-presentation','dashboard-fullscreen');$('exitDashboardBtn').hidden=true;
  if(document.fullscreenElement&&document.exitFullscreen){try{await document.exitFullscreen()}catch(e){}}
  if(wakeLock){try{await wakeLock.release()}catch(e){}wakeLock=null}
+}
+function quickWidgetName(id){return ({'live-sog':'SOG','live-course':'COG','live-heel':'HEEL','trim':'TRIM','wind-detail':'EWD'})[id]||id}
+function selectQuickWidget(id){
+ const card=document.querySelector(`#dashboardGrid [data-widget="${id}"]`);if(!card)return;
+ quickSelectedWidget=id;
+ document.querySelectorAll('#dashboardGrid [data-widget]').forEach(el=>el.classList.toggle('quick-selected',el.dataset.widget===id));
+ $('quickSelectedName').textContent=quickWidgetName(id);
+ $('editorWidgetSelect').value=id;$('widgetSelect').value=id;loadEditorWidgetForm();loadWidgetForm();updateQuickEditorControls();
+}
+function updateQuickEditorControls(){
+ const p=widgetPrefs[quickSelectedWidget]||{};
+ $('quickWidth').textContent=(p.width||'half')==='full'?'Full width ✓':'Half width';
+ const fonts=['small','medium','large','xlarge'],font=p.font||'medium';
+ $('quickFontDown').disabled=fonts.indexOf(font)<=0;$('quickFontUp').disabled=fonts.indexOf(font)>=fonts.length-1;
+ $('quickToggleVisibility').textContent=p.hidden?'Show':'Hide';
+}
+function saveQuickPrefs(patch){
+ const id=quickSelectedWidget;widgetPrefs[id]={...(widgetPrefs[id]||{}),...patch};
+ localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));
+ applyWidgetPrefs();applyDashboardLayout();selectQuickWidget(id);renderWidgetVisibility();
+}
+function quickFontStep(delta){const fonts=['small','medium','large','xlarge'],p=widgetPrefs[quickSelectedWidget]||{},i=fonts.indexOf(p.font||'medium');saveQuickPrefs({font:fonts[Math.max(0,Math.min(fonts.length-1,i+delta))]})}
+function setupQuickPhoneEditor(){
+ const host=$('dashboardGrid');
+ host.addEventListener('click',e=>{if(!document.body.classList.contains('dashboard-editing'))return;if(e.target.closest('button,input,select,a'))return;const card=e.target.closest('[data-widget]');if(card){e.preventDefault();selectQuickWidget(card.dataset.widget)}});
+ $('quickMoveUp').onclick=()=>{$('widgetSelect').value=quickSelectedWidget;moveWidget(-1);selectQuickWidget(quickSelectedWidget)};
+ $('quickMoveDown').onclick=()=>{$('widgetSelect').value=quickSelectedWidget;moveWidget(1);selectQuickWidget(quickSelectedWidget)};
+ $('quickWidth').onclick=()=>{const p=widgetPrefs[quickSelectedWidget]||{};saveQuickPrefs({width:(p.width||'half')==='full'?'half':'full'})};
+ $('quickFontDown').onclick=()=>quickFontStep(-1);$('quickFontUp').onclick=()=>quickFontStep(1);
+ $('quickToggleVisibility').onclick=()=>{const p=widgetPrefs[quickSelectedWidget]||{};saveQuickPrefs({hidden:!p.hidden,visibilityOverride:true})};
+ document.querySelectorAll('[data-quick-bg]').forEach(btn=>btn.addEventListener('click',()=>saveQuickPrefs({bg:btn.dataset.quickBg==='transparent'?'':btn.dataset.quickBg})));
 }
 function setupEditorControls(){
  $('customizeDashboard').onclick=openDashboardEditor;$('closeDashboardEditor').onclick=closeDashboardEditor;
@@ -405,7 +437,7 @@ function renderCockpit(){
  const trim=correctedMotion('pitch'),trim5=avgWindow(pitchHistory,5),trim30=avgWindow(pitchHistory,30);
  if($('trimNow'))$('trimNow').textContent=trim==null?'—':trim.toFixed(1);
  if($('trimAvg5'))$('trimAvg5').textContent=trim5==null?'—°':`${trim5.toFixed(1)}°`;
- if($('trimAvg30'))$('trimAvg30').textContent=trim30==null?'—°':`${trim30.toFixed(1)}°`;if($('trimBar')){const tv=Math.max(-4,Math.min(4,trim??0));$('trimBar').style.left=`${((tv+4)/8)*100}%`;$('trimBar').classList.toggle('unknown',trim==null)}
+ if($('trimAvg30'))$('trimAvg30').textContent=trim30==null?'—°':`${trim30.toFixed(1)}°`;if($('trimBar')){const tv=Math.max(-4,Math.min(4,trim??0));$('trimBar').style.top=`${((4-tv)/8)*100}%`;$('trimBar').classList.toggle('unknown',trim==null)}
  if($('trimCount'))$('trimCount').textContent=motion.enabled?'Motion sensor pitch / longitudinal trim':'Enable motion sensors to read trim';
  if($('sog')&&lastFix?.coords.speed!=null)$('sog').textContent=(lastFix.coords.speed*KNOTS_PER_MS).toFixed(1);const recentSog=sogHistory.filter(x=>Date.now()-x.t<=20000).map(x=>x.value);if($('avgSpeed'))$('avgSpeed').textContent=recentSog.length?(recentSog.reduce((a,b)=>a+b,0)/recentSog.length).toFixed(1):'—';
  if($('course'))$('course').textContent=lastFix?.coords.heading==null?'—':Math.round(lastFix.coords.heading);
@@ -466,14 +498,14 @@ function estimateAutoWind(){
  return {direction,delta:angularDelta(direction,windBaseline),portCourse:a,starboardCourse:b,automatic:true};
 }
 function windEstimate(){return estimateAutoWind()||(()=>{const p=meanForSegments(tackSegments.port),s=meanForSegments(tackSegments.starboard);if(p==null||s==null)return null;const direction=circularMean([p,s]);return direction==null?null:{direction,delta:windBaseline==null?null:angularDelta(direction,windBaseline),portCourse:p,starboardCourse:s}})()}
-function renderWindShiftLeds(delta,tackSide){const host=$('windShiftLeds');if(!host)return;host.innerHTML='';const lift=delta!=null&&tackSide!=='unknown'&&((tackSide==='starboard'&&delta<0)||(tackSide==='port'&&delta>0));for(let i=0;i<4;i++){const led=document.createElement('span');led.className='wind-led';if(delta!=null&&Math.abs(delta)>=1&&tackSide!=='unknown'){const count=Math.min(2,Math.max(1,Math.round(Math.abs(delta)/3)));if(lift&&i<count)led.classList.add('left','on');if(!lift&&i>=4-count)led.classList.add('right','on')}host.append(led)}}
+function renderWindShiftLeds(delta,tackSide){const host=$('windShiftLeds');if(!host)return;host.innerHTML='';const lift=delta!=null&&tackSide!=='unknown'&&((tackSide==='starboard'&&delta<0)||(tackSide==='port'&&delta>0));for(let i=0;i<8;i++){const led=document.createElement('span');led.className='wind-led';if(delta!=null&&Math.abs(delta)>=1&&tackSide!=='unknown'){const count=Math.min(4,Math.max(1,Math.round(Math.abs(delta)/2)));if(lift&&i<count)led.classList.add('left','on');if(!lift&&i>=8-count)led.classList.add('right','on')}host.append(led)}}
 function showFlagEditor(){if(locked)unlockScreen();$('flagEditor').hidden=false;$('flagEditor').scrollIntoView({behavior:'smooth',block:'nearest'});renderFlagList()}
 function renderFlagList(){const host=$('flagList');if(!host)return;host.innerHTML='';(savedFlags||[]).slice().reverse().forEach(e=>{const row=document.createElement('div');row.className='flag-row';const meta=document.createElement('div');meta.innerHTML=`<strong>${new Date(e.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}</strong><div class="muted small"></div>`;meta.querySelector('div').textContent=e.note||'Flag';row.append(meta);if(e.photo){const img=document.createElement('img');img.src=e.photo;img.alt='Flag photo';row.append(img)}host.append(row)})}
 async function saveFlag(){const ev={id:uid(),type:'Flag',timestamp:new Date().toISOString(),lat:lastFix?.coords.latitude??null,lon:lastFix?.coords.longitude??null,note:$('flagNote').value.trim(),photo:flagPhotoData};savedFlags.push(ev);localStorage.setItem('saillabFlags',JSON.stringify(savedFlags));events.push(ev);if(current)await saveCurrent();$('flagNote').value='';$('flagPhotoInput').value='';flagPhotoData=null;$('flagPhotoPreview').innerHTML='';renderFlagList();$('flagEditor').hidden=true;toast('Flag saved with timestamp')}
 function initFlagControls(){if($('flagMomentBtn'))$('flagMomentBtn').onclick=showFlagEditor;$('closeFlagEditor').onclick=()=>$('flagEditor').hidden=true;$('saveFlagBtn').onclick=()=>saveFlag().catch(e=>toast('Could not save flag: '+e.message));$('flagPhotoInput').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{flagPhotoData=await compressPhoto(f);$('flagPhotoPreview').innerHTML='';const img=document.createElement('img');img.src=flagPhotoData;img.alt='Flag preview';$('flagPhotoPreview').append(img)}catch(err){toast('Could not load photo')}}}
 function initRaceFeature(){updateRaceEndpoints();$('gunSeconds').value=localStorage.getItem('saillabGunSeconds')||'300';$('pingCommittee').onclick=()=>pingEndpoint('committee');$('pingPin').onclick=()=>pingEndpoint('pin');$('pingUpwind').onclick=()=>pingEndpoint('upwind');$('gunStart').onclick=startGunCountdown;$('gunSync').onclick=syncGunToMinute;$('gunMinusMinute').onclick=()=>adjustGunMinutes(-1);$('gunPlusMinute').onclick=()=>adjustGunMinutes(1);$('gunReset').onclick=resetGunCountdown;$('centerRaceMap').onclick=()=>{if(raceMap){const pts=[currentPoint(),raceMarks.committee,raceMarks.pin,raceMarks.upwind].filter(Boolean).map(x=>[x.lat,x.lon]);if(pts.length)raceMap.fitBounds(pts,{padding:[25,25],maxZoom:16})}};$('dashboardRaceBtn')&&($('dashboardRaceBtn').onclick=()=>showView('race'));$('widgetSelect').onchange=loadWidgetForm;$('widgetWidth').onchange=saveSelectedWidget;$('widgetFont').onchange=saveSelectedWidget;$('widgetBg').onchange=saveSelectedWidget;$('widgetColor').onchange=saveSelectedWidget;$('widgetUp').onclick=()=>moveWidget(-1);$('widgetDown').onclick=()=>moveWidget(1);$('widgetHide').onclick=()=>{const id=$('widgetSelect').value;widgetPrefs[id]={...(widgetPrefs[id]||{}),hidden:!(widgetPrefs[id]?.hidden)};localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs()};$('widgetReset').onclick=()=>{widgetPrefs={};localStorage.removeItem('saillabWidgetPrefs');applyWidgetPrefs();applyDashboardLayout('race');toast('Dashboard reset')};$('logTrim').onclick=logTrim;$('setWindBaseline').onclick=()=>{const w=windEstimate();if(!w){toast('Need more stable GPS course data first');return}windBaseline=w.direction;localStorage.setItem('saillabWindBaseline',JSON.stringify(windBaseline));updateWind();renderCockpit();toast('Wind baseline set')};$('resetWindData').onclick=()=>{if(!confirm('Clear saved port/starboard legs and the wind-shift baseline?'))return;windBaseline=null;tackSegments={port:[],starboard:[]};localStorage.removeItem('saillabWindBaseline');localStorage.removeItem('saillabWindLegMeans');updateWind();renderCockpit();toast('Wind legs and baseline cleared')};
  $('portTack').onclick=()=>{markTack('port')};$('starboardTack').onclick=()=>{markTack('starboard')};if($('cockpitPortTack'))$('cockpitPortTack').onclick=()=>markTack('port');if($('cockpitStarboardTack'))$('cockpitStarboardTack').onclick=()=>markTack('starboard');
- initFlagControls();dashboardConfig();setupLayoutControls();setupEditorControls();applyDashboardLayout();
+ initFlagControls();dashboardConfig();setupLayoutControls();setupEditorControls();setupQuickPhoneEditor();applyDashboardLayout();
 }
 const originalShowView=showView;
 showView=function(name){originalShowView(name);if(name==='race'){if(!raceMap&&typeof L!=='undefined')initMap('raceMap','race');setTimeout(()=>raceMap?.invalidateSize(),80);refreshMap('race')}if(name==='cockpit'){if(!dashMap&&typeof L!=='undefined')initMap('dashboardMap','dash');setTimeout(()=>dashMap?.invalidateSize(),80);refreshMap('dash');renderCockpit()}if(name==='wind'){setTimeout(()=>{},0);return}};
