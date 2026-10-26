@@ -3,6 +3,7 @@ const $ = id => document.getElementById(id);
 const DB_NAME='SailLabDB', DB_VERSION=1, STORE='sessions';
 let db, watchId=null, current=null, timerId=null, lastFix=null, lastSampleAt=null, sessionStartMs=null, elapsedBeforePause=0, paused=false, samples=[], events=[], tackSegments={port:[],starboard:[]}, activeTack=null, toastTimer, motion={heel:null,pitch:null,enabled:false};
 let dockTunePhotos=[];
+let heelHistory=[],pitchHistory=[];
 let zeroOffsets=JSON.parse(localStorage.getItem('saillabZeroOffsets')||'{"heel":0,"pitch":0}');
 let widgetPrefs=JSON.parse(localStorage.getItem('saillabWidgetPrefs')||'{}');
 let wakeLock=null, locked=false, unlockHoldTimer=null;
@@ -23,8 +24,8 @@ function correctedMotion(channel){
 }
 function updateMotionDisplay(){
   const heel=correctedMotion('heel'), pitch=correctedMotion('pitch');
-  $('heel').innerHTML = heel==null ? '—<small>°</small>' : `${Math.round(heel)}<small>°</small>`;
-  $('pitch').innerHTML = pitch==null ? '—<small>°</small>' : `${(Math.round(pitch / 0.5) * 0.5).toFixed(1)}<small>°</small>`;
+  if($('heel'))$('heel').textContent = heel==null ? '—' : `${Math.round(heel)}`;
+  if($('pitch'))$('pitch').textContent = pitch==null ? '—' : `${(Math.round(pitch / 0.5) * 0.5).toFixed(1)}`;
   $('zeroStatus').textContent=`Zero offsets — HEEL: ${(Number(zeroOffsets.heel)||0).toFixed(1)}°, PITCH: ${(Number(zeroOffsets.pitch)||0).toFixed(1)}°.`;
 }
 function onOrientation(e){
@@ -32,6 +33,7 @@ function onOrientation(e){
   if(Number.isFinite(e.gamma)) motion.heel=e.gamma;
   if(Number.isFinite(e.beta)) motion.pitch=e.beta;
   motion.enabled=true;
+  const heel=correctedMotion('heel'),pitch=correctedMotion('pitch'),now=Date.now(); if(Number.isFinite(heel)){heelHistory.push({t:now,value:heel});heelHistory=heelHistory.filter(x=>now-x.t<=60000)} if(Number.isFinite(pitch)){pitchHistory.push({t:now,value:pitch});pitchHistory=pitchHistory.filter(x=>now-x.t<=60000)}
   updateMotionDisplay();
 }
 async function enableMotion(){
@@ -140,6 +142,51 @@ function cancelUnlockHold(){
   clearTimeout(unlockHoldTimer); unlockHoldTimer=null;
   if(locked)$('tapProgress').textContent='HOLD FOR 3 SECONDS';
 }
+function loadEditorWidgetForm(){
+ const id=$('editorWidgetSelect')?.value;if(!id)return;
+ const p=widgetPrefs[id]||{};
+ $('editorWidgetWidth').value=p.width||'half';$('editorWidgetFont').value=p.font||'medium';
+ $('editorWidgetBg').value=p.bg||'#101f2e';$('editorWidgetColor').value=p.color||'#f1f6fa';
+ $('editorWidgetHide').textContent=p.hidden?'Show widget':'Hide widget';
+}
+function saveEditorWidget(){
+ const id=$('editorWidgetSelect').value;
+ widgetPrefs[id]={...(widgetPrefs[id]||{}),width:$('editorWidgetWidth').value,font:$('editorWidgetFont').value,bg:$('editorWidgetBg').value,color:$('editorWidgetColor').value};
+ localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs();applyDashboardLayout();loadEditorWidgetForm();
+}
+function openDashboardEditor(){
+ if(locked)unlockScreen();
+ $('dashboardEditor').hidden=false;document.body.classList.add('dashboard-editing');
+ loadEditorWidgetForm();$('dashboardEditor').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function closeDashboardEditor(){
+ $('dashboardEditor').hidden=true;document.body.classList.remove('dashboard-editing');
+}
+async function enterDashboardFullscreen(){
+ closeDashboardEditor();
+ document.body.classList.add('cockpit-presentation','dashboard-fullscreen');
+ $('exitDashboardBtn').hidden=false;
+ try{if(!document.fullscreenElement&&document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen()}catch(e){/* CSS fullscreen fallback remains available */}
+ try{if('wakeLock' in navigator&&!wakeLock)wakeLock=await navigator.wakeLock.request('screen')}catch(e){}
+ toast('Dashboard full screen · tap Exit to return');
+}
+async function exitDashboardFullscreen(){
+ document.body.classList.remove('cockpit-presentation','dashboard-fullscreen');$('exitDashboardBtn').hidden=true;
+ if(document.fullscreenElement&&document.exitFullscreen){try{await document.exitFullscreen()}catch(e){}}
+ if(wakeLock){try{await wakeLock.release()}catch(e){}wakeLock=null}
+}
+function setupEditorControls(){
+ $('customizeDashboard').onclick=openDashboardEditor;$('closeDashboardEditor').onclick=closeDashboardEditor;
+ $('editorDoneLock').onclick=enterDashboardFullscreen;$('lockDashboardBtn').onclick=enterDashboardFullscreen;$('exitDashboardBtn').onclick=exitDashboardFullscreen;
+ $('editorWidgetSelect').onchange=loadEditorWidgetForm;
+ ['editorWidgetWidth','editorWidgetFont','editorWidgetBg','editorWidgetColor'].forEach(id=>$(id).addEventListener('change',saveEditorWidget));
+ $('editorWidgetUp').onclick=()=>{ $('widgetSelect').value=$('editorWidgetSelect').value;moveWidget(-1);loadEditorWidgetForm() };
+ $('editorWidgetDown').onclick=()=>{ $('widgetSelect').value=$('editorWidgetSelect').value;moveWidget(1);loadEditorWidgetForm() };
+ $('editorWidgetHide').onclick=()=>{const id=$('editorWidgetSelect').value;widgetPrefs[id]={...(widgetPrefs[id]||{}),hidden:!(widgetPrefs[id]||{}).hidden};localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs();applyDashboardLayout();loadEditorWidgetForm()};
+ $('editorResetLayout').onclick=()=>{widgetPrefs={};localStorage.removeItem('saillabWidgetPrefs');applyDashboardLayout('race');applyWidgetPrefs();loadEditorWidgetForm();toast('Dashboard layout reset')};
+ document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&document.body.classList.contains('dashboard-fullscreen')){document.body.classList.remove('cockpit-presentation','dashboard-fullscreen');$('exitDashboardBtn').hidden=true}});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('dashboard-fullscreen'))exitDashboardFullscreen()});
+}
 function resetWidgetPrefs(){
   widgetPrefs={};dashPrefs={};localStorage.removeItem('saillabWidgetPrefs');localStorage.removeItem('saillabDashPrefs');applyWidgetPrefs();toast('Widget layout reset');
 }
@@ -156,13 +203,13 @@ async function start(){if(current&&current.status==='recording'){toast('Session 
  else{sessionStartMs=Date.now();paused=false}
  updateControls();requestGps();timerId=setInterval(()=>{if(current&&!paused){$('duration').textContent=fmtTime(elapsed());saveCurrent().catch(console.error)}},5000);toast('Recording started')}
 function requestGps(){if(watchId!==null)return;let fixCount=0;watchId=navigator.geolocation.watchPosition(pos=>{fixCount++;lastFix=pos;const c=pos.coords;const speed=c.speed==null?null:Math.max(0,c.speed*KNOTS_PER_MS);const sample={t:pos.timestamp||Date.now(),lat:c.latitude,lon:c.longitude,alt:c.altitude==null?null:c.altitude,accuracy:c.accuracy==null?null:c.accuracy,sog:speed,course:c.heading==null?null:c.heading,heel:correctedMotion('heel'),pitch:correctedMotion('pitch')};if(current&&!paused){samples.push(sample);current.samples=samples;if(samples.length>100000){samples.shift()}if(lastSampleAt){const dt=(sample.t-lastSampleAt)/1000;if(dt>0)$('sampleRate').textContent=(1/dt).toFixed(1)+' Hz effective'}lastSampleAt=sample.t;updateStats();if(activeTack){const prev=activeTack.last;if(prev&&sample.course!=null)activeTack.courseSamples.push(sample.course);activeTack.last=sample;activeTack.distance+=prev?distanceNm(prev,sample):0;activeTack.samples.push(sample)}}
- $('gpsBadge').className='status ok';$('gpsBadge').innerHTML='<span class="dot"></span> GPS active';$('sog').textContent=speed==null?'—':speed.toFixed(1);$('course').innerHTML=(sample.course==null?'—':Math.round(sample.course))+'<small>°</small>';$('accuracy').innerHTML=(sample.accuracy==null?'—':Math.round(sample.accuracy))+'<small> m</small>';$('coords').textContent=`${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)}`;$('samples').textContent=samples.length;if(typeof updateRaceMetrics==='function')updateRaceMetrics();if(typeof renderCockpit==='function')renderCockpit();},err=>{$('gpsBadge').className='status bad';$('gpsBadge').innerHTML='<span class="dot"></span> GPS unavailable';toast(({1:'GPS permission denied. Check your browser settings.',2:'GPS signal unavailable.',3:'GPS timed out. Try again outdoors.'})[err.code]||'GPS error');if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}if($('settingsGpsToggle'))$('settingsGpsToggle').textContent='Enable GPS'}, {enableHighAccuracy:true,maximumAge:1000,timeout:15000})}
+ $('gpsBadge').className='status ok';$('gpsBadge').innerHTML='<span class="dot"></span> GPS active';if($('sog'))$('sog').textContent=speed==null?'—':speed.toFixed(1);if($('course'))$('course').textContent=sample.course==null?'—':Math.round(sample.course);if($('accuracy'))$('accuracy').textContent=sample.accuracy==null?'—':Math.round(sample.accuracy);if($('coords'))$('coords').textContent=`${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)}`;if($('samples'))$('samples').textContent=samples.length;if(typeof updateRaceMetrics==='function')updateRaceMetrics();if(typeof renderCockpit==='function')renderCockpit();},err=>{$('gpsBadge').className='status bad';$('gpsBadge').innerHTML='<span class="dot"></span> GPS unavailable';toast(({1:'GPS permission denied. Check your browser settings.',2:'GPS signal unavailable.',3:'GPS timed out. Try again outdoors.'})[err.code]||'GPS error');if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}if($('settingsGpsToggle'))$('settingsGpsToggle').textContent='Enable GPS'}, {enableHighAccuracy:true,maximumAge:1000,timeout:15000})}
 function stopGps(){if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}}
 function updateControls(){const active=!!current&&current.status==='recording';$('startBtn').disabled=active;$('pauseBtn').disabled=!active;$('resumeBtn').disabled=!(current&&paused);$('stopBtn').disabled=!current||!['recording','paused'].includes(current.status)}
 async function pause(){if(!current||paused)return;elapsedBeforePause=elapsed();paused=true;sessionStartMs=null;await saveCurrent();updateControls();toast('Session paused')}
 async function resume(){if(!current||!paused)return;sessionStartMs=Date.now();paused=false;await saveCurrent();updateControls();requestGps();toast('Recording resumed')}
 async function finish(){if(!current)return;current.durationMs=elapsed();current.status='finished';current.finishedAt=new Date().toISOString();current={...current,...currentMeta(),samples:[...samples],events:[...events]};await dbPut(current);stopGps();clearInterval(timerId);timerId=null;sessionStartMs=null;paused=false;updateControls();renderSessions();renderAnalysis();toast('Session saved on this device')}
-function updateStats(){const valid=samples.map(s=>s.sog).filter(Number.isFinite);$('avgSpeed').textContent=valid.length?(valid.reduce((a,b)=>a+b,0)/valid.length).toFixed(1):'—';$('maxSpeed').textContent=valid.length?Math.max(...valid).toFixed(1):'—';$('samples').textContent=samples.length;const liveSog=$('sog');if(liveSog)liveSog.textContent=lastFix?.coords.speed==null?'—':(lastFix.coords.speed*KNOTS_PER_MS).toFixed(1);const duration=$('duration');if(duration)duration.textContent=fmtTime(elapsed())}
+function updateStats(){const valid=samples.map(s=>s.sog).filter(Number.isFinite);$('avgSpeed').textContent=valid.length?(valid.reduce((a,b)=>a+b,0)/valid.length).toFixed(1):'—';$('maxSpeed').textContent=valid.length?Math.max(...valid).toFixed(1):'—';if($('samples'))$('samples').textContent=samples.length;const liveSog=$('sog');if(liveSog)liveSog.textContent=lastFix?.coords.speed==null?'—':(lastFix.coords.speed*KNOTS_PER_MS).toFixed(1);const duration=$('duration');if(duration)duration.textContent=fmtTime(elapsed())}
 function eventRecord(type,note=''){if(!current){toast('Start a session before logging events');return}const e={id:uid(),type,note,timestamp:new Date().toISOString(),elapsedMs:elapsed(),lat:lastFix?.coords.latitude??null,lon:lastFix?.coords.longitude??null};events.push(e);saveCurrent().catch(console.error);toast(`${type} logged`)}
 function distanceNm(a,b){const rad=x=>x*Math.PI/180;const R=6371000;const dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon),x=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(x))/1852}
 function stats(){const a=samples.map(s=>s.sog).filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return {n:0,mean:null,std:null,median:null};const mean=a.reduce((x,y)=>x+y,0)/a.length;return {n:a.length,mean,std:Math.sqrt(a.reduce((sum,x)=>sum+(x-mean)**2,0)/a.length),median:a.length%2?a[(a.length-1)/2]:(a[a.length/2-1]+a[a.length/2])/2,min:a[0],max:a[a.length-1]}}
@@ -324,7 +371,10 @@ function crossTrackMeters(point,start,end){if(!point||!start||!end)return null;c
 function updateRaceEndpoints(){if($('committeeStatus')){$('committeeStatus').textContent=raceMarks.committee?'Ping saved':'Not pinged';$('committeeCoords').textContent=fmtCoord(raceMarks.committee);$('pinStatus').textContent=raceMarks.pin?'Ping saved':'Not pinged';$('pinCoords').textContent=fmtCoord(raceMarks.pin);const len=getLineLengthNm();$('lineLength').innerHTML=len==null?'—<small> nm</small>':`${len.toFixed(3)}<small> nm</small>`}}
 function remainingGunSeconds(){return gunDeadline==null?null:(gunDeadline-Date.now())/1000}
 function updateRaceMetrics(){if(!$('lineDistance'))return;const point=currentPoint(),lineReady=raceMarks.committee&&raceMarks.pin&&point;let dist=null,seconds=null;if(lineReady){dist=crossTrackMeters(point,raceMarks.committee,raceMarks.pin);const sog=lastFix?.coords.speed==null?null:lastFix.coords.speed*KNOTS_PER_MS;if(sog!=null&&sog>0.15)seconds=Math.abs(dist)/1852/sog*3600}
- $('lineDistance').innerHTML=dist==null?'—<small> m</small>':`${Math.round(Math.abs(dist))}<small> m</small>`;$('timeToLine').textContent=seconds==null?'—':fmtClock(seconds);const gun=remainingGunSeconds();$('gunCountdown').textContent=gun==null?fmtClock(Number($('gunSeconds')?.value||0)):fmtClock(gun);if(gun!=null){$('gunStatus').textContent=gun<=0?'GUN TIME':'Countdown running'}else $('gunStatus').textContent='Countdown not running';let burn=gun!=null&&seconds!=null?gun-seconds:null;$('timeToBurn').textContent=burn==null?'—':fmtClock(burn);$('burnHint').textContent=burn==null?'Set gun countdown and get a GPS fix':burn>=0?'Positive = time to kill / slow down':'Negative = estimated late';if($('dashBurn')){$('dashBurn').textContent=burn==null?'—':fmtClock(burn);$('dashTimeToLine').textContent=seconds==null?'—':fmtClock(seconds)}}
+ $('lineDistance').innerHTML=dist==null?'—<small> m</small>':`${Math.round(Math.abs(dist))}<small> m</small>`;$('timeToLine').textContent=seconds==null?'—':fmtClock(seconds);const gun=remainingGunSeconds();$('gunCountdown').textContent=gun==null?fmtClock(Number($('gunSeconds')?.value||0)):fmtClock(gun);if(gun!=null){$('gunStatus').textContent=gun<=0?'GUN TIME':'Countdown running'}else $('gunStatus').textContent='Countdown not running';let burn=gun!=null&&seconds!=null?gun-seconds:null;$('timeToBurn').textContent=burn==null?'—':fmtClock(burn);$('burnHint').textContent=burn==null?'Set gun countdown and get a GPS fix':burn>=0?'Positive = time to kill / slow down':'Negative = estimated late';if($('dashBurn')){$('dashBurn').textContent=burn==null?'—':fmtClock(burn);$('dashTimeToLine').textContent=seconds==null?'—':fmtClock(seconds)}
+ const sq=$('lineSquare'),sqHint=$('lineSquareHint');
+ if(sq&&raceMarks.committee&&raceMarks.pin){const wind=windEstimate();if(wind){const lineBearing=bearingDeg(raceMarks.committee,raceMarks.pin);let angle=Math.abs(angularDelta(lineBearing,wind.direction));if(angle>90)angle=180-angle;const deviation=90-angle;sq.textContent=deviation<0.5?'Square':`±${deviation.toFixed(1)}°`;if(sqHint)sqHint.textContent=deviation<0.5?'Line is square to estimated wind':`${deviation.toFixed(1)}° off square · based on estimated wind`}else{sq.textContent='—';if(sqHint)sqHint.textContent='Record both tacks to estimate wind direction'}}else if(sq){sq.textContent='—';if(sqHint)sqHint.textContent='Ping both endpoints first'}
+}
 function finishGunCountdown(){if(gunTimer)clearInterval(gunTimer);gunTimer=null;$('gunCountdown').textContent='00:00';$('gunStatus').textContent='START — switching to cockpit';toast('Start! Switching to cockpit');if(!raceAutoSwitched){raceAutoSwitched=true;setTimeout(()=>showView('cockpit'),900)}}
 function ensureGunTimer(){if(gunTimer)clearInterval(gunTimer);gunTimer=setInterval(()=>{updateRaceMetrics();if(remainingGunSeconds()<=0){gunDeadline=null;finishGunCountdown()}},100)}
 function startGunCountdown(){const sec=Math.max(0,Number($('gunSeconds').value)||0);if(sec<=0){toast('Set a countdown greater than zero');return}gunDeadline=Date.now()+sec*1000;localStorage.setItem('saillabGunSeconds',String(sec));raceAutoSwitched=false;ensureGunTimer();updateRaceMetrics();toast('Start countdown running')}
@@ -334,21 +384,26 @@ function resetGunCountdown(){if(gunTimer)clearInterval(gunTimer);gunTimer=null;g
 function initMap(containerId,which){if(typeof L==='undefined')return null;const el=$(containerId);if(!el)return null;const map=L.map(el,{zoomControl:true,attributionControl:true}).setView([41.0,9.0],10);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);const layers={};layers.boat=L.circleMarker([41,9],{radius:7,color:'#54e0c0',fillColor:'#54e0c0',fillOpacity:1,weight:2}).bindTooltip('Your boat');layers.committee=L.circleMarker([41,9],{radius:7,color:'#a78bfa',fillColor:'#a78bfa',fillOpacity:1,weight:2}).bindTooltip('Committee boat');layers.pin=L.circleMarker([41,9],{radius:7,color:'#ffb454',fillColor:'#ffb454',fillOpacity:1,weight:2}).bindTooltip('Pin');layers.line=L.polyline([[41,9],[41,9]],{color:'#f1f6fa',weight:3,dashArray:'7 6'});Object.values(layers).forEach(l=>l.addTo(map));if(which==='race'){raceMap=map;raceLayers=layers}else{dashMap=map;dashLayers=layers}refreshMap(which);return map}
 function refreshMap(which){const map=which==='race'?raceMap:dashMap,layers=which==='race'?raceLayers:dashLayers;if(!map||!layers)return;const p=currentPoint();if(p){layers.boat.setLatLng([p.lat,p.lon]);layers.boat.setStyle({opacity:1,fillOpacity:1})}else layers.boat.setStyle({opacity:0,fillOpacity:0});for(const k of ['committee','pin']){const v=raceMarks[k];if(v){layers[k].setLatLng([v.lat,v.lon]);layers[k].setStyle({opacity:1,fillOpacity:1})}else layers[k].setStyle({opacity:0,fillOpacity:0})}if(raceMarks.committee&&raceMarks.pin)layers.line.setLatLngs([[raceMarks.committee.lat,raceMarks.committee.lon],[raceMarks.pin.lat,raceMarks.pin.lon]]);else layers.line.setLatLngs([]);const pts=[p,raceMarks.committee,raceMarks.pin].filter(Boolean).map(x=>[x.lat,x.lon]);if(pts.length&&map._saillabFirstFit!==true){map.fitBounds(pts,{padding:[25,25],maxZoom:16});map._saillabFirstFit=true}}
 function refreshMaps(){refreshMap('race');refreshMap('dash')}
-function renderCockpit(){const trimVals=trimReadings.map(x=>x.value).filter(Number.isFinite),avgTrim=trimVals.length?trimVals.reduce((a,b)=>a+b,0)/trimVals.length:null;$('trimAverage').textContent=avgTrim==null?'—':avgTrim.toFixed(2);$('trimCount').textContent=`${trimVals.length} manually logged reading${trimVals.length===1?'':'s'}`;updateWind();updateRaceMetrics();drawHeelTrimChart();refreshMaps()}
+function avgWindow(history,seconds){const now=Date.now(),values=history.filter(x=>now-x.t<=seconds*1000).map(x=>x.value).filter(Number.isFinite);return values.length?values.reduce((a,b)=>a+b,0)/values.length:null}
+function renderCockpit(){
+ const heel=correctedMotion('heel');
+ if($('heel'))$('heel').textContent=heel==null?'—':Math.round(heel);
+ const h5=avgWindow(heelHistory,5),h20=avgWindow(heelHistory,20);
+ if($('heelAvg5'))$('heelAvg5').textContent=h5==null?'—°':`${h5.toFixed(1)}°`;
+ if($('heelAvg20'))$('heelAvg20').textContent=h20==null?'—°':`${h20.toFixed(1)}°`;
+ if($('heelBubble')){const value=Math.max(-16,Math.min(16,heel??0));$('heelBubble').style.left=`${((value+16)/32)*100}%`; $('heelBubble').classList.toggle('unknown',heel==null)}
+ const trim=correctedMotion('pitch'),trim5=avgWindow(pitchHistory,5),trim30=avgWindow(pitchHistory,30);
+ if($('trimNow'))$('trimNow').textContent=trim==null?'—':trim.toFixed(1);
+ if($('trimAvg5'))$('trimAvg5').textContent=trim5==null?'—°':`${trim5.toFixed(1)}°`;
+ if($('trimAvg30'))$('trimAvg30').textContent=trim30==null?'—°':`${trim30.toFixed(1)}°`;
+ if($('trimCount'))$('trimCount').textContent=motion.enabled?'Motion sensor pitch / longitudinal trim':'Enable motion sensors to read trim';
+ if($('sog')&&lastFix?.coords.speed!=null)$('sog').textContent=(lastFix.coords.speed*KNOTS_PER_MS).toFixed(1);
+ if($('course'))$('course').textContent=lastFix?.coords.heading==null?'—':Math.round(lastFix.coords.heading);
+ updateWind();updateRaceMetrics();refreshMaps();
+}
 function dashboardConfig(){applyWidgetPrefs();const editor=$('dashboardEditor');if(editor)editor.hidden=true}
 function saveDashOrder(){[...$('dashboardGrid').querySelectorAll('[data-widget]')].forEach((el,i)=>{const id=el.dataset.widget;widgetPrefs[id]={...(widgetPrefs[id]||{}),order:i}});localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs()}
-function setupDragWidgets(){let dragged=null;document.querySelectorAll('[data-dash-widget]').forEach(card=>{card.addEventListener('dragstart',e=>{if(!document.body.classList.contains('editing-cockpit')){e.preventDefault();return}dragged=card;card.classList.add('dragging');e.dataTransfer.effectAllowed='move'});card.addEventListener('dragend',()=>{card.classList.remove('dragging');dragged=null});card.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move'});card.addEventListener('drop',e=>{e.preventDefault();if(dragged&&dragged!==card){const rect=card.getBoundingClientRect(),after=e.clientY>rect.top+rect.height/2;card.parentNode.insertBefore(dragged,after?card.nextSibling:card);saveDashOrder()}})})}
-function drawHeelTrimChart(){const c=$('heelTrimChart');if(!c||!c.offsetParent)return;const rect=c.getBoundingClientRect(),ratio=window.devicePixelRatio||1,w=Math.max(260,rect.width),h=150;c.width=w*ratio;c.height=h*ratio;const ctx=c.getContext('2d');ctx.setTransform(ratio,0,0,ratio,0,0);ctx.clearRect(0,0,w,h);ctx.strokeStyle='#294054';ctx.lineWidth=1;for(let i=0;i<4;i++){const y=12+(h-24)*i/3;ctx.beginPath();ctx.moveTo(12,y);ctx.lineTo(w-8,y);ctx.stroke()}const heel=samples.map(s=>s.heel).filter(Number.isFinite).slice(-80),trim=trimReadings.slice(-80).map(x=>x.value).filter(Number.isFinite);const all=[...heel,...trim];if(!all.length){ctx.fillStyle='#9eb0c0';ctx.font='12px sans-serif';ctx.fillText('Record a session and log trim values',12,30);return}let min=Math.min(...all),max=Math.max(...all);if(max-min<1){max+=1;min-=1}function line(vals,color){if(vals.length<2)return;ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();vals.forEach((v,i)=>{const x=12+(w-24)*i/(vals.length-1),y=h-12-(v-min)/(max-min)*(h-24);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke()}line(heel,'#ff729f');line(trim,'#64d9ff');ctx.fillStyle='#ff729f';ctx.fillText('Heel',12,11);ctx.fillStyle='#64d9ff';ctx.fillText('Trim',58,11)}
-function logTrim(){const value=Number($('trimValue').value);if($('trimValue').value===''||!Number.isFinite(value)){toast('Enter a numeric trim value first');return}trimReadings.push({value,t:Date.now(),sessionId:current?.id||null});if(trimReadings.length>1000)trimReadings=trimReadings.slice(-1000);localStorage.setItem('saillabTrimReadings',JSON.stringify(trimReadings));$('trimValue').value='';renderCockpit();toast('Trim reading logged')}
-function meanForSegments(list){const vals=list.map(seg=>Number.isFinite(seg.meanCourse)?seg.meanCourse:circularMean(seg.courseSamples||seg.samples?.map(s=>s.course)||[])).filter(Number.isFinite);return vals.length?circularMean(vals):null}
-function persistWindLegMeans(){const compact={port:tackSegments.port.map(seg=>({meanCourse:Number.isFinite(seg.meanCourse)?seg.meanCourse:circularMean(seg.courseSamples||[])})).filter(seg=>Number.isFinite(seg.meanCourse)),starboard:tackSegments.starboard.map(seg=>({meanCourse:Number.isFinite(seg.meanCourse)?seg.meanCourse:circularMean(seg.courseSamples||[])})).filter(seg=>Number.isFinite(seg.meanCourse))};localStorage.setItem('saillabWindLegMeans',JSON.stringify(compact))}
-function windEstimate(){const port=meanForSegments(tackSegments.port),star=meanForSegments(tackSegments.starboard);if(port==null||star==null)return null;const dir=(port+angularDelta(star,port)/2+360)%360;return {port,star,direction:dir,delta:windBaseline==null?null:angularDelta(dir,windBaseline)}}
-function renderWindShiftLeds(delta){
- const host=$('windShiftLeds'); if(!host)return;
- if(!host.children.length){for(let i=0;i<17;i++){const led=document.createElement('span');led.className='wind-led';led.dataset.index=String(i);host.appendChild(led)}}
- const v=Number.isFinite(delta)?Math.max(-8,Math.min(8,Math.round(delta))):0;
- [...host.children].forEach((led,i)=>{led.className='wind-led';if(i===8)led.classList.add('neutral');else if(v<0&&i>=8+v&&i<8)led.classList.add('left','on');else if(v>0&&i>8&&i<=8+v)led.classList.add('right','on')});
-}
+
 function updateWind(){
  const portCount=tackSegments.port.length+(activeTack?.type==='port'?1:0),starCount=tackSegments.starboard.length+(activeTack?.type==='starboard'?1:0);
  $('portCount').textContent=portCount;$('starboardCount').textContent=starCount;
@@ -366,13 +421,28 @@ function updateWind(){
 }
 // Replace the older marker implementation with a segment-aware tack recorder.
 function markTack(type){if(!current){toast('Start a session before marking a tack');return}if(activeTack){activeTack.endedAt=new Date().toISOString();activeTack.durationMs=activeTack.samples.length>1?activeTack.samples.at(-1).t-activeTack.samples[0].t:0;activeTack.meanCourse=circularMean(activeTack.courseSamples);if(activeTack.samples.length>=3&&activeTack.courseSamples.length>=2)tackSegments[activeTack.type].push(activeTack);persistWindLegMeans();activeTack=null}activeTack={type,startAt:new Date().toISOString(),samples:[],courseSamples:[],distance:0,last:lastFix?{lat:lastFix.coords.latitude,lon:lastFix.coords.longitude,t:Date.now(),course:lastFix.coords.heading==null?null:lastFix.coords.heading}:null};if(lastFix?.coords.heading!=null)activeTack.courseSamples.push(lastFix.coords.heading);events.push({id:uid(),type:type==='port'?'Port tack start':'Starboard tack start',timestamp:new Date().toISOString(),lat:lastFix?.coords.latitude??null,lon:lastFix?.coords.longitude??null});updateWind();toast(type==='port'?'Port tack leg started':'Starboard tack leg started')}
-function initRaceFeature(){updateRaceEndpoints();$('gunSeconds').value=localStorage.getItem('saillabGunSeconds')||'300';$('pingCommittee').onclick=()=>pingEndpoint('committee');$('pingPin').onclick=()=>pingEndpoint('pin');$('gunStart').onclick=startGunCountdown;$('gunSync').onclick=syncGunToMinute;$('gunMinusMinute').onclick=()=>adjustGunMinutes(-1);$('gunPlusMinute').onclick=()=>adjustGunMinutes(1);$('gunReset').onclick=resetGunCountdown;$('centerRaceMap').onclick=()=>{if(raceMap){const pts=[currentPoint(),raceMarks.committee,raceMarks.pin].filter(Boolean).map(x=>[x.lat,x.lon]);if(pts.length)raceMap.fitBounds(pts,{padding:[25,25],maxZoom:16})}};$('dashboardRaceBtn').onclick=()=>showView('race');$('editDashboard').onclick=()=>{const editing=document.body.classList.contains('editing-cockpit');if(editing){document.body.classList.remove('editing-cockpit');document.body.classList.add('cockpit-presentation');$('editDashboard').textContent='Edit dashboard';lockScreen()}else{document.body.classList.remove('cockpit-presentation');document.body.classList.add('editing-cockpit');$('editDashboard').textContent='Save & lock';toast('Edit mode: drag widgets to reorder. Customize size and colors in Settings.')}};$('dashboardReset').onclick=()=>{dashPrefs={};localStorage.removeItem('saillabDashPrefs');dashboardConfig()};$('logTrim').onclick=logTrim;$('setWindBaseline').onclick=()=>{const w=windEstimate();if(!w){toast('Record both tacks first');return}windBaseline=w.direction;localStorage.setItem('saillabWindBaseline',JSON.stringify(windBaseline));updateWind();renderCockpit();toast('Wind baseline set')};$('resetWindData').onclick=()=>{if(!confirm('Clear saved port/starboard legs and the wind-shift baseline?'))return;windBaseline=null;tackSegments={port:[],starboard:[]};localStorage.removeItem('saillabWindBaseline');localStorage.removeItem('saillabWindLegMeans');updateWind();renderCockpit();toast('Wind legs and baseline cleared')};
+
+function applyDashboardLayout(layout){
+ const grid=$('dashboardGrid');if(!grid)return;
+ const chosen=layout||localStorage.getItem('saillabDashboardLayout')||'race';
+ grid.dataset.layout=chosen;document.querySelectorAll('[data-layout]').forEach(b=>b.classList.toggle('active',b.dataset.layout===chosen));
+ if($('dashboardLayout'))$('dashboardLayout').value=chosen;
+ localStorage.setItem('saillabDashboardLayout',chosen);
+ const defaultOrder={race:['live-sog','live-course','live-heel','trim','wind-detail'],balanced:['live-sog','live-course','wind-detail','live-heel','trim'],minimal:['live-sog','live-course','live-heel','wind-detail','trim'],big:['live-sog','live-course','live-heel','trim','wind-detail']}[chosen]||['live-sog','live-course','live-heel','trim','wind-detail'];
+ const cards=[...grid.querySelectorAll('[data-widget]')];
+ if(layout||!cards.some(card=>widgetPrefs[card.dataset.widget]?.order!==undefined)){defaultOrder.forEach((id,i)=>{const card=grid.querySelector(`[data-widget="${id}"]`);if(card){grid.appendChild(card);widgetPrefs[id]={...(widgetPrefs[id]||{}),order:i}}});localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));}
+ else cards.sort((a,b)=>(widgetPrefs[a.dataset.widget]?.order??100)-(widgetPrefs[b.dataset.widget]?.order??100)).forEach(card=>grid.appendChild(card));
+ grid.querySelectorAll('[data-widget]').forEach(card=>{const id=card.dataset.widget,p=widgetPrefs[id]||{};let full=chosen==='big'||(chosen==='race'&&id==='wind-detail')||(chosen==='balanced'&&id==='wind-detail')||(chosen==='minimal'&&id==='wind-detail');if(p.width)full=p.width==='full';card.classList.toggle('widget-full',full);card.classList.toggle('dash-wide',full);card.classList.toggle('widget-hidden',p.hidden===true||(chosen==='minimal'&&id==='trim'));});
+}
+function setupLayoutControls(){document.querySelectorAll('[data-layout]').forEach(b=>b.addEventListener('click',()=>applyDashboardLayout(b.dataset.layout)));if($('dashboardLayout'))$('dashboardLayout').addEventListener('change',e=>applyDashboardLayout(e.target.value));}
+
+function initRaceFeature(){updateRaceEndpoints();$('gunSeconds').value=localStorage.getItem('saillabGunSeconds')||'300';$('pingCommittee').onclick=()=>pingEndpoint('committee');$('pingPin').onclick=()=>pingEndpoint('pin');$('gunStart').onclick=startGunCountdown;$('gunSync').onclick=syncGunToMinute;$('gunMinusMinute').onclick=()=>adjustGunMinutes(-1);$('gunPlusMinute').onclick=()=>adjustGunMinutes(1);$('gunReset').onclick=resetGunCountdown;$('centerRaceMap').onclick=()=>{if(raceMap){const pts=[currentPoint(),raceMarks.committee,raceMarks.pin].filter(Boolean).map(x=>[x.lat,x.lon]);if(pts.length)raceMap.fitBounds(pts,{padding:[25,25],maxZoom:16})}};$('dashboardRaceBtn')&&($('dashboardRaceBtn').onclick=()=>showView('race'));$('widgetSelect').onchange=loadWidgetForm;$('widgetWidth').onchange=saveSelectedWidget;$('widgetFont').onchange=saveSelectedWidget;$('widgetBg').onchange=saveSelectedWidget;$('widgetColor').onchange=saveSelectedWidget;$('widgetUp').onclick=()=>moveWidget(-1);$('widgetDown').onclick=()=>moveWidget(1);$('widgetHide').onclick=()=>{const id=$('widgetSelect').value;widgetPrefs[id]={...(widgetPrefs[id]||{}),hidden:!(widgetPrefs[id]?.hidden)};localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs()};$('widgetReset').onclick=()=>{widgetPrefs={};localStorage.removeItem('saillabWidgetPrefs');applyWidgetPrefs();applyDashboardLayout('race');toast('Dashboard reset')};$('logTrim').onclick=logTrim;$('setWindBaseline').onclick=()=>{const w=windEstimate();if(!w){toast('Record both tacks first');return}windBaseline=w.direction;localStorage.setItem('saillabWindBaseline',JSON.stringify(windBaseline));updateWind();renderCockpit();toast('Wind baseline set')};$('resetWindData').onclick=()=>{if(!confirm('Clear saved port/starboard legs and the wind-shift baseline?'))return;windBaseline=null;tackSegments={port:[],starboard:[]};localStorage.removeItem('saillabWindBaseline');localStorage.removeItem('saillabWindLegMeans');updateWind();renderCockpit();toast('Wind legs and baseline cleared')};
  $('portTack').onclick=()=>{markTack('port')};$('starboardTack').onclick=()=>{markTack('starboard')};$('cockpitPortTack').onclick=()=>{markTack('port')};$('cockpitStarboardTack').onclick=()=>{markTack('starboard')};
- dashboardConfig();setupDragWidgets();
+ dashboardConfig();setupLayoutControls();setupEditorControls();applyDashboardLayout();
 }
 const originalShowView=showView;
 showView=function(name){originalShowView(name);if(name==='race'){if(!raceMap&&typeof L!=='undefined')initMap('raceMap','race');setTimeout(()=>raceMap?.invalidateSize(),80);refreshMap('race')}if(name==='cockpit'){if(!dashMap&&typeof L!=='undefined')initMap('dashboardMap','dash');setTimeout(()=>dashMap?.invalidateSize(),80);refreshMap('dash');renderCockpit()}if(name==='wind'){setTimeout(()=>{},0);return}};
-window.addEventListener('resize',()=>{if($('view-cockpit')?.classList.contains('active')){drawHeelTrimChart();dashMap?.invalidateSize()}if($('view-race')?.classList.contains('active'))raceMap?.invalidateSize()});
+window.addEventListener('resize',()=>{if($('view-cockpit')?.classList.contains('active')){dashMap?.invalidateSize();renderCockpit()}if($('view-race')?.classList.contains('active'))raceMap?.invalidateSize()});
 const previousRequestGps=requestGps;
 requestGps=function(){previousRequestGps();if($('settingsGpsToggle'))$('settingsGpsToggle').textContent='Disable GPS';setTimeout(()=>{updateRaceMetrics();renderCockpit()},300)};
 const previousUpdateStats=updateStats;
@@ -380,5 +450,5 @@ updateStats=function(){previousUpdateStats();renderCockpit()};
 const previousOrientationDisplay=updateMotionDisplay;
 updateMotionDisplay=function(){previousOrientationDisplay();renderCockpit()};
 const previousApplyPrefs=applyWidgetPrefs;
-applyWidgetPrefs=function(){previousApplyPrefs();renderCockpit()};
+applyWidgetPrefs=function(){previousApplyPrefs();applyDashboardLayout();renderCockpit()};
 initRaceFeature();if(typeof L!=='undefined')initMap('dashboardMap','dash');updateWind();updateRaceMetrics();renderCockpit();setTimeout(()=>dashMap?.invalidateSize(),100);
