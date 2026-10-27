@@ -68,3 +68,6 @@ The Dashboard Appearance editor now includes a phone-shaped 9:20 canvas approxim
 - Weather map displays current position and pinged committee/pin/upwind marks. Windy model preview supports ECMWF, GFS and ICON; PredictWind opens externally. A provider API/licence is required to put SailLab markers directly on a third-party forecast map.
 
 Important: local profiles and sessions do not sync between devices. For secure authentication and cloud persistence, a backend service and user database are required.
+
+
+V16 updates: removed unavailable depth/temperature and unsupported motion-rate channels; added per-widget signed zero-centred bars, numeric markers, and configurable 0/0.5/1/2/3-second damping/averaging windows.

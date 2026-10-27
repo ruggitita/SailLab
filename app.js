@@ -184,6 +184,21 @@ function startUnlockHold(){
   unlockHoldTimer=setTimeout(()=>{unlockScreen();toast('Dashboard unlocked')},1800);
 }
 function cancelUnlockHold(){clearTimeout(unlockHoldTimer);unlockHoldTimer=null;if(locked)$('tapProgress').textContent='LONG PRESS TO UNLOCK'}
+const CHANNELS=[
+ {id:'timestamp',label:'Timestamp',group:'GPS / time',unit:'',max:86400},{id:'latitude',label:'Latitude',group:'GPS / time',unit:'°',max:90},{id:'longitude',label:'Longitude',group:'GPS / time',unit:'°',max:180},{id:'sog',label:'SOG · Speed Over Ground',group:'GPS / time',unit:'kn',max:20},{id:'cog',label:'COG · Course Over Ground',group:'GPS / time',unit:'°',max:360},{id:'gps-altitude',label:'GPS Altitude',group:'GPS / time',unit:'m',max:3000},{id:'heel',label:'Heel',group:'Motion',unit:'°',max:16},{id:'pitch',label:'Pitch',group:'Motion',unit:'°',max:10},
+ {id:'race-timer',label:'Race Timer',group:'Start / line',unit:'',max:1800},{id:'time-to-start',label:'Time to Start',group:'Start / line',unit:'',max:1800},{id:'distance-to-line',label:'Distance to Line',group:'Start / line',unit:'m',max:500},{id:'time-to-line',label:'Time to Line',group:'Start / line',unit:'',max:600},{id:'time-to-kill',label:'Time to Kill',group:'Start / line',unit:'',max:600},{id:'line-length',label:'Line Length',group:'Start / line',unit:'m',max:1000},{id:'line-square',label:'Line Square',group:'Start / line',unit:'°',max:90},{id:'line-bias',label:'Line Bias',group:'Start / line',unit:'m',max:300},{id:'line-length-at-sog',label:'Line Length at SOG',group:'Start / line',unit:'s',max:1800},{id:'start-line',label:'Start Line',group:'Start / line',unit:'',max:1},{id:'race-events',label:'Race Events / elapsed',group:'Start / line',unit:'',max:100},
+ {id:'vmg',label:'VMG',group:'Boat performance',unit:'kn',max:15},{id:'wind-angle',label:'Wind Angle',group:'Boat performance',unit:'°',max:180},{id:'speed-port',label:'Average Speed · Port Tack',group:'Boat performance',unit:'kn',max:20},{id:'speed-starboard',label:'Average Speed · Starboard Tack',group:'Boat performance',unit:'kn',max:20},{id:'tack-speed-delta',label:'Port / Starboard Speed Delta',group:'Boat performance',unit:'kn',max:10},{id:'ewd',label:'EWD · Estimated Wind Direction',group:'Wind',unit:'°',max:360},{id:'wind-shift',label:'Wind Shift',group:'Wind',unit:'°',max:45}
+];
+const channelHistory={};
+function fillChannelSelectors(){const sel=$('newWidgetSource'),list=$('channelLibraryList');if(!sel||sel.dataset.ready==='1')return;sel.innerHTML='';let group='';CHANNELS.forEach(c=>{if(c.group!==group){group=c.group;const og=document.createElement('optgroup');og.label=group;sel.append(og)}const opt=document.createElement('option');opt.value=c.id;opt.textContent=c.label;sel.lastElementChild.append(opt)});sel.dataset.ready='1';list.innerHTML='';CHANNELS.forEach(c=>{const row=document.createElement('div');row.className='channel-library-row';const label=document.createElement('span');label.textContent=c.label;const small=document.createElement('small');small.textContent=c.group;const info=document.createElement('div');info.append(label,small);const btn=document.createElement('button');btn.type='button';btn.className='secondary compact';btn.textContent='＋ Add';btn.addEventListener('click',()=>{sel.value=c.id;$('newWidgetLabel').value=c.label;$('newWidgetUnits').value=c.unit;$('newWidgetMode').value='number';createCustomWidget()});row.append(info,btn);list.append(row)});sel.addEventListener('change',()=>{const c=CHANNELS.find(x=>x.id===sel.value);if(c){$('newWidgetLabel').value=c.label;$('newWidgetUnits').value=c.unit}});}
+function numericMetric(id){const el=$(id);if(!el)return null;const txt=(el.innerText||el.textContent||'').replace(/\s+/g,' ').trim();if(!txt||txt==='—')return null;const clock=txt.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);if(clock)return Number(clock[1])*60+Number(clock[2])+(Number(clock[3]||0)/60);const n=txt.replace(/,/g,'.').match(/-?\d+(?:\.\d+)?/);return n?Number(n[0]):null}
+function channelAverage(values){const a=(values||[]).filter(Number.isFinite);return a.length?a.reduce((sum,v)=>sum+v,0)/a.length:null}
+function tackAverageSpeed(type){const segs=tackSegments[type]||[];const vals=segs.flatMap(seg=>(seg.samples||[]).map(x=>x.sog)).filter(Number.isFinite);return channelAverage(vals)}
+function channelValue(source){if(source==='trim')source='pitch';if(source==='clock')return {value:elapsed()/1000,max:3600,unit:'',display:fmtTime(elapsed())};if(source==='gps-accuracy')source='gps-accuracy';const c=CHANNELS.find(x=>x.id===source),coords=lastFix?.coords||{};let value=null;
+ const speed=coords.speed==null?null:Math.max(0,coords.speed*KNOTS_PER_MS),course=coords.heading??null;
+ switch(source){case'timestamp':return {value:Date.now()/1000,max:86400,unit:'',display:new Date().toLocaleTimeString()};case'latitude':value=lastFix?.coords?.latitude??null;break;case'longitude':value=lastFix?.coords?.longitude??null;break;case'sog':value=speed;break;case'cog':value=course;break;case'gps-altitude':value=coords.altitude??null;break;case'gps-accuracy':value=coords.accuracy??null;break;case'heel':value=correctedMotion('heel');break;case'pitch':value=correctedMotion('pitch');break;case'race-timer':value=remainingGunSeconds();break;case'time-to-start':value=remainingGunSeconds();break;case'distance-to-line':value=numericMetric('lineDistance');break;case'time-to-line':value=numericMetric('timeToLine');break;case'time-to-kill':value=numericMetric('timeToBurn');break;case'line-length':{const nm=getLineLengthNm();value=nm==null?null:nm*1852;break}case'line-square':value=numericMetric('lineSquare');break;case'line-bias':{const sq=numericMetric('lineSquare'),len=getLineLengthNm();value=sq==null||len==null?null:Math.sin(Math.abs(sq)*Math.PI/180)*len*1852;break}case'line-length-at-sog':value=numericMetric('lineLengthSeconds');break;case'start-line':value=raceMarks.committee&&raceMarks.pin?1:0;break;case'race-events':value=(events||[]).length;break;case'vmg':{const hist=sogHistory.filter(x=>Date.now()-x.t<15000).map(x=>x.value);value=hist.length&&course!=null?channelAverage(hist)*Math.cos((course-(autoWindState.direction??course))*Math.PI/180):null;break;}case'wind-angle':value=course==null||autoWindState.direction==null?null:Math.abs(angularDelta(course,autoWindState.direction));break;case'speed-port':value=tackAverageSpeed('port');break;case'speed-starboard':value=tackAverageSpeed('starboard');break;case'tack-speed-delta':{const a=tackAverageSpeed('port'),b=tackAverageSpeed('starboard');value=a==null||b==null?null:a-b;break}case'ewd':value=autoWindState.direction;break;case'wind-shift':value=autoWindState.direction==null||windBaseline==null?null:angularDelta(autoWindState.direction,windBaseline);break;}
+ return {value,max:c?.max||100,unit:c?.unit||'',display:null};
+}
 function renderWidgetVisibility(){
  const host=$('widgetVisibilityList');if(!host)return;host.innerHTML='';
  const labels={'live-sog':'SOG','live-course':'COG','live-heel':'HEEL','trim':'TRIM','wind-detail':'EWD'};customWidgetDefs.forEach(w=>labels[w.id]=w.label||'Custom');
@@ -192,12 +207,12 @@ function renderWidgetVisibility(){
 function loadEditorWidgetForm(){
  const id=$('editorWidgetSelect')?.value;if(!id)return;
  const p=widgetPrefs[id]||{}, parts=p.parts||{}, offsets=p.offsets||{};
- $('editorWidgetWidth').value=p.width||'half';$('editorWidgetFont').value=p.font||'medium';
+ $('editorWidgetWidth').value=p.width||'half';$('editorWidgetFont').value=p.font||'medium';$('editorWidgetChartMode').value=customWidgetDefs.find(w=>w.id===id)?.mode||p.chartMode||'number';
  $('editorWidgetBg').value=p.bg||'#101f2e';$('editorWidgetColor').value=p.color||'#f1f6fa';
  const defaultSizes={'live-sog':96,'live-course':72,'live-heel':68,'trim':68,'wind-detail':68};
  $('editorValueSize').value=p.valueSize||defaultSizes[id]||68;$('editorLabelSize').value=p.labelSize||9;$('editorSecondarySize').value=p.secondarySize||10;
  $('editorDecimals').value=p.decimals===undefined?'default':String(p.decimals);
- $('editorBarScale').value=p.barScale||100;$('editorBarThickness').value=p.barThickness||12;
+ $('editorBarScale').value=p.barScale||100;$('editorBarThickness').value=p.barThickness||12;$('editorZeroCenter').checked=p.zeroCenter===true;$('editorDamping').value=String(p.dampingSec??0);$('editorMarkers').value=Array.isArray(p.markers)?p.markers.join(', '):'';
  $('editorPositionPart').value=p.positionPart||'value';const off=offsets[$('editorPositionPart').value]||{x:0,y:0};$('editorOffsetX').value=off.x||0;$('editorOffsetY').value=off.y||0;
  $('editorOdometer').checked=p.odometer===true;
  $('partShowLabel').checked=parts.label!==false;$('partShowValue').checked=parts.value!==false;$('partShowSecondary').checked=parts.secondary!==false;$('partShowAverages').checked=parts.averages!==false;$('partShowBar').checked=parts.bar!==false;$('partShowScale').checked=p.showScale!==false;$('partShowExtraBar').checked=p.extraBar===true;
@@ -216,12 +231,12 @@ function saveEditorWidget(){
  offsets[partName]={x:Number($('editorOffsetX').value)||0,y:Number($('editorOffsetY').value)||0};
  widgetPrefs[id]={...prev,width:$('editorWidgetWidth').value,font:$('editorWidgetFont').value,bg:$('editorWidgetBg').value,color:$('editorWidgetColor').value,customLabel:$('editorCustomLabel').value.trim(),customUnits:$('editorCustomUnits').value.trim(),
   valueSize:Number($('editorValueSize').value),labelSize:Number($('editorLabelSize').value),secondarySize:Number($('editorSecondarySize').value),
-  decimals:$('editorDecimals').value==='default'?undefined:Number($('editorDecimals').value),barScale:Number($('editorBarScale').value),barThickness:Number($('editorBarThickness').value),
+  decimals:$('editorDecimals').value==='default'?undefined:Number($('editorDecimals').value),barScale:Number($('editorBarScale').value),barThickness:Number($('editorBarThickness').value),zeroCenter:$('editorZeroCenter').checked,dampingSec:Number($('editorDamping').value)||0,markers:$('editorMarkers').value.split(',').map(v=>Number(v.trim())).filter(Number.isFinite).slice(0,12),
   positionPart:partName,offsets,odometer:$('editorOdometer').checked,showScale:$('partShowScale').checked,extraBar:$('partShowExtraBar').checked,
-  parts:{...(prev.parts||{}),label:$('partShowLabel').checked,value:$('partShowValue').checked,secondary:$('partShowSecondary').checked,averages:$('partShowAverages').checked,bar:$('partShowBar').checked}};
+  chartMode:$('editorWidgetChartMode').value,parts:{...(prev.parts||{}),label:$('partShowLabel').checked,value:$('partShowValue').checked,secondary:$('partShowSecondary').checked,averages:$('partShowAverages').checked,bar:$('partShowBar').checked}};
  if(prev.canvas){const c={...prev.canvas};if($('editorWidgetWidth').value==='full'){c.w=Math.max(c.w,96);c.x=2}else if(prev.width==='full'&&$('editorWidgetWidth').value==='half'){c.w=47;c.x=Math.min(c.x,51)}widgetPrefs[id].canvas=c;}
- const def=customWidgetDefs.find(w=>w.id===id);if(def){def.label=$('editorCustomLabel').value.trim()||'Custom';def.units=$('editorCustomUnits').value.trim();localStorage.setItem('saillabCustomWidgets',JSON.stringify(customWidgetDefs));syncEditorWidgetOptions();}
- localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs();applyDashboardLayout();applyCanvasLayout(document.body.classList.contains('dashboard-editing')||document.body.classList.contains('dashboard-fullscreen'));updateFineTuneOutputs();renderWidgetVisibility();
+ const def=customWidgetDefs.find(w=>w.id===id);if(def){def.label=$('editorCustomLabel').value.trim()||'Custom';def.units=$('editorCustomUnits').value.trim();def.mode=$('editorWidgetChartMode').value;const selectedCard=document.querySelector(`#dashboardGrid [data-widget="${id}"]`);if(selectedCard){selectedCard.dataset.mode=def.mode;selectedCard.querySelector('.custom-widget-meter').hidden=def.mode!=='bar';selectedCard.querySelector('.custom-widget-vertical').hidden=def.mode!=='vertical';selectedCard.querySelector('.custom-widget-chart').hidden=def.mode!=='chart';}localStorage.setItem('saillabCustomWidgets',JSON.stringify(customWidgetDefs));syncEditorWidgetOptions();}
+ localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));applyWidgetPrefs();applyDashboardLayout();applyCanvasLayout(document.body.classList.contains('dashboard-editing')||document.body.classList.contains('dashboard-fullscreen'));renderCustomWidgets();updateFineTuneOutputs();renderWidgetVisibility();
 }
 function openDashboardEditor(){
  if(locked)unlockScreen();
@@ -251,12 +266,12 @@ function syncEditorWidgetOptions(){
  [...select.options].forEach(o=>{if(o.value.startsWith('custom-')&&!customWidgetDefs.some(w=>w.id===o.value))o.remove()});
 }
 function initCustomWidgets(){
- const grid=$('dashboardGrid');if(!grid)return;
- customWidgetDefs.forEach(def=>{if(grid.querySelector(`[data-widget="${def.id}"]`))return;const card=document.createElement('article');card.className='panel dash-widget ios-card custom-metric-card';card.dataset.widget=def.id;card.dataset.source=def.source;card.dataset.mode=def.mode||'number';card.innerHTML=`<div class="ios-card-head" data-part="label"><span class="ios-symbol custom-symbol">+</span><span class="metric-label custom-label"></span></div><div class="ios-value custom-main-value" data-part="value"><span class="custom-value">—</span><small class="custom-units"></small></div><div class="custom-widget-meter" data-part="bar" hidden><span></span></div><div class="ios-foot custom-secondary" data-part="secondary"></div>`;card.querySelector('.custom-label').textContent=def.label||'Custom';card.querySelector('.custom-units').textContent=def.units||'';card.querySelector('.custom-secondary').textContent=`${def.source.toUpperCase()} · ${def.mode||'number'}`;if(def.mode==='bar')card.querySelector('.custom-widget-meter').hidden=false;if(def.mode==='odometer')card.classList.add('odometer-mode');grid.append(card)});
+ fillChannelSelectors();const grid=$('dashboardGrid');if(!grid)return;
+ customWidgetDefs.forEach(def=>{if(grid.querySelector(`[data-widget="${def.id}"]`))return;const card=document.createElement('article');card.className='panel dash-widget ios-card custom-metric-card';card.dataset.widget=def.id;card.dataset.source=def.source;card.dataset.mode=def.mode||'number';card.innerHTML=`<div class="ios-card-head" data-part="label"><span class="ios-symbol custom-symbol">+</span><span class="metric-label custom-label"></span></div><div class="ios-value custom-main-value" data-part="value"><span class="custom-value">—</span><small class="custom-units"></small></div><div class="custom-widget-meter" data-part="bar" hidden><i class="custom-zero-line"></i><span></span><div class="custom-marker-layer"></div></div><div class="custom-widget-vertical" data-part="bar" hidden><i class="custom-zero-line"></i><span></span><div class="custom-marker-layer"></div></div><div class="custom-widget-chart" data-part="chart" hidden><div class="custom-chart-marker-layer"></div></div><div class="ios-foot custom-secondary" data-part="secondary"></div>`;card.querySelector('.custom-label').textContent=def.label||'Custom';card.querySelector('.custom-units').textContent=def.units||'';card.querySelector('.custom-secondary').textContent=`${def.source.toUpperCase()} · ${def.mode||'number'}`;if(def.mode==='bar')card.querySelector('.custom-widget-meter').hidden=false;if(def.mode==='vertical')card.querySelector('.custom-widget-vertical').hidden=false;if(def.mode==='chart')card.querySelector('.custom-widget-chart').hidden=false;if(def.mode==='odometer')card.classList.add('odometer-mode');grid.append(card)});
  syncEditorWidgetOptions();
 }
 function createCustomWidget(){
- const label=$('newWidgetLabel').value.trim()||'Custom';const source=$('newWidgetSource').value;const mode=$('newWidgetMode').value;const units=$('newWidgetUnits').value.trim()||({sog:'kn',cog:'°',heel:'°',trim:'°',ewd:'°',clock:'', 'gps-accuracy':'m'}[source]||'');
+ const source=$('newWidgetSource').value;const channel=CHANNELS.find(c=>c.id===source);const label=$('newWidgetLabel').value.trim()||channel?.label||'Custom';const mode=$('newWidgetMode').value;const units=$('newWidgetUnits').value.trim()||channel?.unit||'';
  const id='custom-'+Date.now().toString(36);const def={id,label,source,mode,units};customWidgetDefs.push(def);localStorage.setItem('saillabCustomWidgets',JSON.stringify(customWidgetDefs));
  initCustomWidgets();widgetPrefs[id]={width:'half',font:'medium',valueSize:44,labelSize:9,secondarySize:9,bg:'#101f2e',color:'#f1f6fa'};localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));
  const select=$('editorWidgetSelect');select.value=id;applyWidgetPrefs();applyCanvasLayout(true);setupCanvasDragHandles();loadEditorWidgetForm();renderWidgetVisibility();renderCustomWidgets();toast('Custom widget created — drag it into position');
@@ -265,20 +280,44 @@ function deleteSelectedCustomWidget(){
  const id=$('editorWidgetSelect').value;if(!id.startsWith('custom-'))return;if(!confirm('Delete this custom widget?'))return;
  customWidgetDefs=customWidgetDefs.filter(w=>w.id!==id);localStorage.setItem('saillabCustomWidgets',JSON.stringify(customWidgetDefs));delete widgetPrefs[id];localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));document.querySelector(`#dashboardGrid [data-widget="${id}"]`)?.remove();syncEditorWidgetOptions();renderWidgetVisibility();$('editorWidgetSelect').value='live-sog';applyWidgetPrefs();applyCanvasLayout(true);loadEditorWidgetForm();toast('Custom widget deleted');
 }
-function sourceWidgetValue(def){
- const source=def.source;let value=null,max=1,unit=def.units||'';
- if(source==='sog'){value=lastFix?.coords.speed==null?null:lastFix.coords.speed*KNOTS_PER_MS;max=20}
- else if(source==='cog'){value=lastFix?.coords.heading??null;max=360}
- else if(source==='heel'){value=correctedMotion('heel');max=16}
- else if(source==='trim'){value=correctedMotion('pitch');max=4}
- else if(source==='ewd'){value=autoWindState.direction;max=360}
- else if(source==='clock'){value=elapsed()/1000;max=3600;unit=''}
- else if(source==='gps-accuracy'){value=lastFix?.coords.accuracy??null;max=50}
- return {value,max,unit};
-}
+function sourceWidgetValue(def){const c=channelValue(def.source);return {value:c.value,max:c.max||1,unit:def.units||c.unit||'',display:c.display}}
 function renderCustomWidgets(){
  if(!$('dashboardGrid'))return;
- customWidgetDefs.forEach(def=>{const card=$(`widget-${def.id}`)||document.querySelector(`#dashboardGrid [data-widget="${def.id}"]`);if(!card)return;const {value,max,unit}=sourceWidgetValue(def);const val=card.querySelector('.custom-value');if(val){if(value==null||!Number.isFinite(value))val.textContent='—';else if(def.source==='clock')val.textContent=fmtTime(value*1000);else val.textContent=widgetNumber(def.id,value,def.source==='cog'||def.source==='ewd'||def.source==='gps-accuracy'?0:1)}const u=card.querySelector('.custom-units');if(u)u.textContent=unit;const meter=card.querySelector('.custom-widget-meter');if(meter){meter.hidden=def.mode!=='bar';meter.querySelector('span').style.width=`${value==null?0:Math.max(0,Math.min(100,Math.abs(value)/max*100))}%`}card.classList.toggle('odometer-mode',def.mode==='odometer'||widgetPrefs[def.id]?.odometer===true);});
+ const now=Date.now();
+ customWidgetDefs.forEach(def=>{
+  const card=$(`widget-${def.id}`)||document.querySelector(`#dashboardGrid [data-widget="${def.id}"]`);if(!card)return;
+  const pref=widgetPrefs[def.id]||{};let {value,max,unit,display}=sourceWidgetValue(def);
+  const windowMs=Math.max(0,Number(pref.dampingSec)||0)*1000;
+  const history=channelHistory[def.id]||(channelHistory[def.id]=[]);
+  if(Number.isFinite(value)){if(!history.length||now-history[history.length-1].t>=250)history.push({t:now,v:value});}
+  while(history.length&&now-history[0].t>Math.max(10000,windowMs+5000))history.shift();
+  if(windowMs>0&&Number.isFinite(value)){
+   const recent=history.filter(x=>now-x.t<=windowMs).map(x=>x.v);
+   if(recent.length)value=channelAverage(recent);
+  }
+  const val=card.querySelector('.custom-value');
+  if(val){if(display!=null)val.textContent=display;else if(value==null||!Number.isFinite(value))val.textContent='—';else if(['race-timer','time-to-start','time-to-line','time-to-kill','line-length-at-sog'].includes(def.source))val.textContent=fmtClock(Math.max(0,value));else val.textContent=widgetNumber(def.id,value,def.source==='cog'||def.source==='ewd'||def.source==='line-square'||def.source==='wind-angle'?0:1)}
+  const u=card.querySelector('.custom-units');if(u)u.textContent=unit;
+  const markers=(Array.isArray(pref.markers)?pref.markers:[]).filter(Number.isFinite);
+  const zeroCenter=pref.zeroCenter===true;
+  const scale=Math.max(0.001,Number(max)||1);
+  const markerPct=(m)=>zeroCenter?50+(Math.max(-scale,Math.min(scale,m))/(2*scale))*100:Math.max(0,Math.min(100,m/scale*100));
+  const meter=card.querySelector('.custom-widget-meter');
+  if(meter){meter.hidden=def.mode!=='bar';meter.classList.toggle('zero-centered',zeroCenter);meter.style.setProperty('--custom-bar-thickness',(pref.barThickness||10)+'px');const fill=meter.querySelector('span');const pct=value==null?0:zeroCenter?Math.min(50,Math.abs(value)/scale*50):Math.min(100,Math.abs(value)/scale*100);fill.style.width=pct+'%';fill.style.left=zeroCenter?(value<0?50-pct:50)+'%':'0%';fill.style.right=zeroCenter?(value<0?50:50-pct)+'%':'auto';fill.classList.toggle('negative',Number(value)<0);const ml=meter.querySelector('.custom-marker-layer');ml.innerHTML='';markers.forEach(m=>{const tick=document.createElement('i');tick.className='custom-marker';tick.style.setProperty('--marker-left',markerPct(m)+'%');tick.title=String(m);ml.append(tick)});}
+  const vertical=card.querySelector('.custom-widget-vertical');
+  if(vertical){vertical.hidden=def.mode!=='vertical';vertical.classList.toggle('zero-centered',zeroCenter);const fill=vertical.querySelector('span');const pct=value==null?0:zeroCenter?Math.min(50,Math.abs(value)/scale*50):Math.min(100,Math.abs(value)/scale*100);fill.style.height=pct+'%';fill.style.bottom=zeroCenter?(value<0?50-pct:50)+'%':'0%';fill.style.top=zeroCenter?(value<0?50:50-pct)+'%':'auto';fill.classList.toggle('negative',Number(value)<0);const ml=vertical.querySelector('.custom-marker-layer');ml.innerHTML='';markers.forEach(m=>{const tick=document.createElement('i');tick.className='custom-marker';tick.style.setProperty('--marker-bottom',markerPct(m)+'%');tick.title=String(m);ml.append(tick)});}
+  const chart=card.querySelector('.custom-widget-chart');
+  if(chart){chart.hidden=def.mode!=='chart';if(def.mode==='chart'){
+   const stepMs=Math.max(500,Number(pref.dampingSec||1)*1000);
+   if(Number.isFinite(value)&&(!history._chartLast||now-history._chartLast>=stepMs)){history._chartLast=now;history._chart=(history._chart||[]).concat([{t:now,v:value}]).slice(-36)}
+   const vals=(history._chart||[]).map(x=>x.v);const lo=zeroCenter?-scale:Math.min(...vals,0),hi=zeroCenter?scale:Math.max(...vals,1),range=hi-lo||1;
+   chart.innerHTML='<div class="custom-chart-marker-layer"></div><div class="custom-chart-zero-line"></div>';
+   const layer=chart.querySelector('.custom-chart-marker-layer');markers.forEach(m=>{const tick=document.createElement('i');tick.className='custom-chart-marker';tick.style.bottom=Math.max(0,Math.min(100,(m-lo)/range*100))+'%';tick.title=String(m);layer.append(tick)});
+   if(zeroCenter){const zero=chart.querySelector('.custom-chart-zero-line');zero.style.bottom=((0-lo)/range*100)+'%'}
+   vals.forEach(v=>{const bar=document.createElement('i');bar.className='custom-chart-column';if(zeroCenter){const zero=(0-lo)/range*100,point=(v-lo)/range*100;bar.style.bottom=Math.min(zero,point)+'%';bar.style.height=Math.abs(point-zero)+'%';bar.classList.toggle('negative',v<0)}else bar.style.height=Math.max(4,(v-lo)/range*100)+'%';chart.append(bar)});
+  }}
+  card.classList.toggle('odometer-mode',def.mode==='odometer'||pref.odometer===true);card.classList.toggle('custom-vertical-mode',def.mode==='vertical');card.classList.toggle('custom-chart-mode',def.mode==='chart');
+ });
 }
 const defaultCanvasPositions={
  race:{'live-sog':{x:2,y:2,w:47,h:18},'live-course':{x:51,y:2,w:47,h:18},'live-heel':{x:2,y:22,w:47,h:22},trim:{x:51,y:22,w:47,h:22},'wind-detail':{x:2,y:46,w:96,h:24}},
@@ -301,7 +340,8 @@ function setupCanvasDragHandles(){
  const grid=$('dashboardGrid');if(!grid||!document.body.classList.contains('dashboard-editing'))return;
  grid.querySelectorAll('[data-widget]').forEach(card=>{
   if(!card.querySelector('.canvas-drag-handle')){const h=document.createElement('button');h.type='button';h.className='canvas-drag-handle';h.setAttribute('aria-label','Drag widget');h.title='Drag this widget';h.textContent='⠿';card.append(h)}
-  if(!card.querySelector('.canvas-lock-handle')){const l=document.createElement('button');l.type='button';l.className='canvas-lock-handle';l.setAttribute('aria-label','Lock widget position');l.title='Lock widget position';l.addEventListener('click',e=>{e.stopPropagation();const id=card.dataset.widget;widgetPrefs[id]={...(widgetPrefs[id]||{}),locked:!(widgetPrefs[id]||{}).locked};localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));syncCanvasLockState(card);toast(widgetPrefs[id].locked?'Widget position locked':'Widget position unlocked')});card.append(l)}
+  if(!card.querySelector('.canvas-resize-handle')){const r=document.createElement('button');r.type='button';r.className='canvas-resize-handle';r.setAttribute('aria-label','Resize widget');r.title='Resize widget';r.textContent='↘';r.addEventListener('click',e=>e.stopPropagation());card.append(r)}
+  if(!card.querySelector('.canvas-lock-handle')){const l=document.createElement('button');l.type='button';l.className='canvas-lock-handle';l.setAttribute('aria-label','Lock widget position and size');l.title='Lock widget position and size';l.addEventListener('click',e=>{e.stopPropagation();const id=card.dataset.widget;widgetPrefs[id]={...(widgetPrefs[id]||{}),locked:!(widgetPrefs[id]||{}).locked};localStorage.setItem('saillabWidgetPrefs',JSON.stringify(widgetPrefs));syncCanvasLockState(card);toast(widgetPrefs[id].locked?'Widget position and size locked':'Widget position and size unlocked')});card.append(l)}
   card.classList.add('canvas-draggable');syncCanvasLockState(card);
  });
 }
@@ -320,7 +360,7 @@ function setupEditorControls(){
  $('customizeDashboard').onclick=openDashboardEditor;$('closeDashboardEditor').onclick=closeDashboardEditor;
  $('editorDoneLock').onclick=lockScreen;$('lockDashboardBtn').onclick=lockScreen;$('exitDashboardBtn').onclick=exitDashboardFullscreen;
  $('editorWidgetSelect').onchange=()=>{loadEditorWidgetForm();document.querySelectorAll('#dashboardGrid [data-widget]').forEach(c=>c.classList.toggle('canvas-selected',c.dataset.widget===$('editorWidgetSelect').value))};
- ['editorWidgetWidth','editorWidgetFont','editorWidgetBg','editorWidgetColor','editorCustomLabel','editorCustomUnits','editorDecimals','editorOdometer','partShowLabel','partShowValue','partShowSecondary','partShowAverages','partShowBar','partShowScale','partShowExtraBar','editorBarScale','editorBarThickness','editorValueSize','editorLabelSize','editorSecondarySize','editorOffsetX','editorOffsetY'].forEach(id=>$(id).addEventListener(['editorValueSize','editorLabelSize','editorSecondarySize','editorOffsetX','editorOffsetY','editorBarScale','editorBarThickness'].includes(id)?'input':'change',saveEditorWidget));
+ ['editorWidgetWidth','editorWidgetFont','editorWidgetBg','editorWidgetColor','editorCustomLabel','editorCustomUnits','editorDecimals','editorOdometer','editorWidgetChartMode','partShowLabel','partShowValue','partShowSecondary','partShowAverages','partShowBar','partShowScale','partShowExtraBar','editorBarScale','editorBarThickness','editorZeroCenter','editorDamping','editorMarkers','editorValueSize','editorLabelSize','editorSecondarySize','editorOffsetX','editorOffsetY'].forEach(id=>$(id).addEventListener(['editorValueSize','editorLabelSize','editorSecondarySize','editorOffsetX','editorOffsetY','editorBarScale','editorBarThickness'].includes(id)?'input':'change',saveEditorWidget));
  $('editorPositionPart').addEventListener('change',()=>{const p=widgetPrefs[$('editorWidgetSelect').value]||{},off=p.offsets?.[$('editorPositionPart').value]||{x:0,y:0};$('editorOffsetX').value=off.x||0;$('editorOffsetY').value=off.y||0;saveEditorWidget()});
  $('editorWidgetUp').onclick=()=>{ $('widgetSelect').value=$('editorWidgetSelect').value;moveWidget(-1);loadEditorWidgetForm() };
  $('editorWidgetDown').onclick=()=>{ $('widgetSelect').value=$('editorWidgetSelect').value;moveWidget(1);loadEditorWidgetForm() };
