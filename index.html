@@ -12,10 +12,32 @@
 <link crossorigin="" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" rel="stylesheet"/>
 <title>SailLab</title>
 </head>
-<body>
+<body class="not-authenticated">
+<section id="loginGate" class="login-gate" aria-label="SailLab login">
+  <div class="login-card">
+    <div class="login-mark">⛵</div><p class="eyebrow">SAILLAB / PERFORMANCE</p><h1>SailLab</h1>
+    <p class="muted small">Accedi al tuo profilo locale per ritrovare sessioni e dashboard salvate su questo dispositivo.</p>
+    <div id="loginExistingWrap" hidden><label>Profilo<select id="loginProfileSelect"></select></label><label>Password<input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password"/></label><button class="primary full" id="loginSubmit" type="button">Accedi</button></div>
+    <div class="login-divider"><span>Nuovo profilo</span></div>
+    <label>Nome profilo<input id="registerName" maxlength="28" autocomplete="nickname" placeholder="Es. Team Aurora"/></label>
+    <label>Crea password<input id="registerPassword" type="password" minlength="4" autocomplete="new-password" placeholder="Almeno 4 caratteri"/></label>
+    <button class="secondary full" id="registerSubmit" type="button">Crea profilo</button>
+    <p class="muted tiny">Questo accesso è locale: i profili e le sessioni rimangono nel browser di questo dispositivo. Non è un account cloud e non sincronizza automaticamente altri telefoni.</p>
+    <p id="loginError" class="login-error" aria-live="polite"></p>
+  </div>
+</section>
+<section id="deviceSetupOverlay" class="modal-gate" hidden aria-label="Device setup">
+ <div class="login-card device-card"><p class="eyebrow">DISPLAY SETUP</p><h2>Configura lo schermo</h2><p class="muted small">Scegli il dispositivo oppure inserisci l'area utile in pixel CSS. La configurazione modifica l'anteprima e il layout, non la risoluzione fisica del display.</p>
+  <label>Dispositivo<select id="devicePreset"><option value="s21ultra">Samsung S21 Ultra</option><option value="s21">Samsung S21</option><option value="iphone">iPhone</option><option value="tablet">Tablet</option><option value="custom">Personalizzato</option></select></label>
+  <div class="form-grid"><label>Larghezza utile<input id="deviceWidth" type="number" min="240" max="1800" value="360"/></label><label>Altezza utile<input id="deviceHeight" type="number" min="240" max="2400" value="800"/></label></div>
+  <label>Orientamento<select id="deviceOrientation"><option value="portrait">Verticale</option><option value="landscape">Orizzontale</option></select></label>
+  <div class="button-row"><button class="secondary" id="deviceSetupCancel" type="button">Annulla</button><button class="primary" id="deviceSetupSave" type="button">Salva dispositivo</button></div>
+ </div>
+</section>
+
 <header class="topbar">
 <div><div class="eyebrow">SAILLAB / PERFORMANCE</div><h1>SailLab</h1></div>
-<div class="topbar-tools"><div class="status" id="gpsBadge"><span class="dot"></span> GPS inactive</div></div>
+<div class="topbar-tools"><span id="activeProfileBadge" class="profile-badge" hidden></span><button id="changeDeviceBtn" class="secondary compact" type="button" hidden>Device</button><button id="logoutBtn" class="secondary compact" type="button" hidden>Logout</button><div class="status" id="gpsBadge"><span class="dot"></span> GPS inactive</div></div>
 </header>
 <main>
 <section class="view" id="view-race">
@@ -49,6 +71,12 @@
 <div class="dashboard-presets" aria-label="Dashboard layout presets">
 <button class="layout-chip active" type="button" data-layout="race">Race</button><button class="layout-chip" type="button" data-layout="balanced">Balanced</button><button class="layout-chip" type="button" data-layout="minimal">Minimal</button><button class="layout-chip" type="button" data-layout="big">Big numbers</button><label class="theme-inline">Theme <select id="dashboardTheme"><option value="blue">Ocean</option><option value="dark">Night</option><option value="light">Daylight</option><option value="purple">Electric</option><option value="yellow">Solar</option><option value="teal">Regatta Teal</option><option value="sunset">Sunset</option><option value="contrast">High contrast</option></select></label>
 </div>
+<section class="dashboard-pages panel" id="dashboardPagesPanel">
+ <div class="panel-heading"><div><h3>Dashboard pages</h3><p class="muted small">Salva fino a 10 configurazioni per il tuo profilo.</p></div><span id="dashboardPageCount" class="page-count">0 / 10</span></div>
+ <div class="dashboard-page-actions"><label>Nome pagina<input id="dashboardPageName" maxlength="24" placeholder="Es. Upwind / Race day"/></label><button class="primary compact" id="saveDashboardPage" type="button">Save current</button></div>
+ <div id="dashboardPageList" class="dashboard-page-list"></div>
+ <button class="secondary compact" id="configureDeviceFromDashboard" type="button">Display size & orientation</button>
+</section>
 <section class="dashboard-editor panel" id="dashboardEditor" hidden aria-label="Dashboard layout editor">
 <div class="editor-title-row"><div><h3>Customize your cockpit</h3><p class="muted small">Drag a widget inside the phone preview to position it. Use the corner handle to resize it. The canvas uses the Samsung S21 Ultra portrait proportions; the same positions are used in full screen.</p></div><button class="secondary compact" type="button" id="closeDashboardEditor">Done</button></div>
 <div class="custom-widget-builder panel"><h4>Create a custom widget</h4><div class="form-grid"><label>Widget label<input id="newWidgetLabel" maxlength="20" placeholder="e.g. VMG" value="VMG"/></label><label>Data source<select id="newWidgetSource"><option value="sog">SOG · speed</option><option value="cog">COG · course</option><option value="heel">HEEL · heel angle</option><option value="trim">TRIM · pitch</option><option value="ewd">EWD · estimated wind</option><option value="clock">Clock · elapsed time</option><option value="gps-accuracy">GPS accuracy</option></select></label></div><div class="form-grid"><label>Display style<select id="newWidgetMode"><option value="number">Large number</option><option value="bar">Number + bar</option><option value="odometer">Odometer</option></select></label><label>Units<input id="newWidgetUnits" maxlength="8" placeholder="kn / ° / s"/></label></div><button class="primary" id="createCustomWidget" type="button">＋ Create widget</button></div>
@@ -75,6 +103,13 @@
 <article class="panel dash-widget ios-card ewd-card" data-widget="wind-detail" id="widget-wind-detail"><div class="ios-card-head" data-part="label"><span class="ios-symbol ewd-symbol">W</span><span class="metric-label">EWD <small>estimated wind direction</small></span></div><div class="ios-value" data-part="value"><span id="windDirection">—</span><small>°</small></div><div class="ewd-shift-line" data-part="bar"><span>LIFT</span><div class="wind-shift-leds eight-leds" id="windShiftLeds" aria-label="Eight sector lift/header indicator"></div><span>HEADER</span></div><div class="ewd-shift-status" data-part="secondary"><strong id="dashWindShift">—</strong><span id="dashWindLabel">SHIFT</span></div><div class="ios-foot" data-part="secondary" id="windBaselineLabel">Auto estimate · updates every 20 s when GPS course data is usable</div><div class="ios-foot" data-part="secondary" id="autoWindQuality">Waiting for stable GPS course legs</div><div class="ewd-controls"><button class="secondary" id="setWindBaseline" type="button">Set baseline</button></div><div class="ewd-secondary" hidden><button id="refreshGps" type="button"></button><span id="accuracy">—</span><span id="coords">Waiting for GPS</span><span id="samples">0</span><span id="duration">00:00</span><span id="pitch">—</span><input id="trimValue" type="hidden"/><button id="logTrim" type="button"></button><span id="leftShift">—</span><span id="rightShift">—</span><span id="windResult"></span><span id="portCount">0</span><span id="starboardCount">0</span><span id="portMean"></span><span id="starboardMean"></span><span id="dashWindHeading">—</span><span id="dashTrueWindDirection">—</span><span id="cockpitPortCount">0</span><span id="cockpitStarboardCount">0</span><button id="cockpitPortTack" type="button"></button><button id="cockpitStarboardTack" type="button"></button><button id="resetWindData" type="button"></button><span id="windNeedle"></span></div></article>
 </div></div>
 <section class="flag-editor panel" id="flagEditor" hidden><div class="editor-title-row"><div><h3>Session flag</h3><p class="muted small">Save the current timestamp and GPS position, optionally with a note or photo.</p></div><button class="secondary compact" id="closeFlagEditor" type="button">Close</button></div><label>Note (optional)<textarea id="flagNote" rows="2" placeholder="What happened at this moment?"></textarea></label><label>Add photo (optional)<input id="flagPhotoInput" type="file" accept="image/*" capture="environment"/></label><div id="flagPhotoPreview" class="flag-photo-preview"></div><div class="button-row"><button class="primary" id="saveFlagBtn" type="button">Save flag</button></div><div id="flagList" class="flag-list"></div></section>
+</section>
+<section class="view" id="view-map">
+ <div class="section-head"><div><p class="eyebrow wind-color">FORECAST / RACECOURSE</p><h2>Weather map</h2></div><span class="live-pill">Forecast models</span></div>
+ <div class="panel form-panel"><h3>Forecast model</h3><label>Wind forecast model<select id="forecastModel"><option value="ecmwf">Windy · ECMWF</option><option value="gfs">Windy · GFS</option><option value="icon">Windy · ICON</option><option value="predictwind">PredictWind (open provider)</option></select></label><div class="button-row"><button class="primary" id="openForecastModel" type="button">Open selected forecast</button><button class="secondary" id="centerWeatherMap" type="button">Center on marks</button></div><p class="muted small">The model viewer requires an internet connection. PredictWind data and model access may require a PredictWind account/subscription. Forecast model selection opens the chosen provider; SailLab does not claim to have a licensed PredictWind API connection.</p></div>
+ <div class="panel map-panel"><div class="panel-heading"><div><h3>Racecourse & pinged marks</h3><p class="muted small">Boat position, committee boat, pin and upwind mark.</p></div><button class="secondary compact" id="refreshWeatherMarks" type="button">Refresh</button></div><div class="map weather-race-map" id="weatherRaceMap"></div><div class="weather-legend"><span>● Boat</span><span>● Committee</span><span>● Pin</span><span>● Upwind mark</span></div></div>
+ <div class="panel map-panel"><div class="panel-heading"><div><h3>Forecast preview</h3><p class="muted small">Wind map preview from Windy for supported models.</p></div></div><iframe id="forecastFrame" title="Weather forecast map" loading="lazy" referrerpolicy="no-referrer" allowfullscreen></iframe></div>
+ <div class="notice">Race marks are stored locally and displayed on the SailLab racecourse map. The forecast provider's map is a separate service; synchronising SailLab markers inside a third-party map requires a provider API or an official embed that supports custom markers.</div>
 </section>
 <section class="view" id="view-session">
 <div class="section-head"><div><p class="eyebrow">SESSION RECORDING</p><h2>Session</h2></div></div>
@@ -130,7 +165,7 @@
 <h3>Full backup</h3><button class="primary full" id="backupBtn">Download all sessions (JSON)</button>
 <p class="muted small">Keep regular backups: clearing browser data may delete sessions.</p>
 </div><span hidden="True" id="sampleRate"></span></section></main>
-<nav aria-label="Main navigation" class="bottom-nav"><button class="nav-item active" data-view="cockpit"><span>▦</span>DASHBOARD</button><button class="nav-item" data-view="race"><span>⚑</span>START</button><button class="nav-item" data-view="session"><span>⏱</span>SESSION</button><button class="nav-item" data-view="analysis"><span>⌁</span>ANALYSIS</button><button class="nav-item" data-view="settings"><span>⚙</span>SETTINGS</button></nav>
+<nav aria-label="Main navigation" class="bottom-nav"><button class="nav-item active" data-view="cockpit"><span>▦</span>DASHBOARD</button><button class="nav-item" data-view="race"><span>⚑</span>START</button><button class="nav-item" data-view="map"><span>⌁</span>MAP</button><button class="nav-item" data-view="session"><span>⏱</span>SESSION</button><button class="nav-item" data-view="analysis"><span>⌁</span>ANALYSIS</button><button class="nav-item" data-view="settings"><span>⚙</span>SETTINGS</button></nav>
 <div aria-hidden="true" class="screen-lock-overlay" id="screenLockOverlay">
 <div class="lock-card"><div class="lock-symbol">⌑</div><h2>Screen locked</h2><p>Press and hold anywhere on this screen for 3 seconds to unlock.</p><p class="muted small">Keep the phone mounted securely. This lock only prevents accidental app touches; it is not a device-level security lock.</p><div id="tapProgress">HOLD FOR 3 SECONDS</div></div>
 </div>

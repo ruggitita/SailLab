@@ -38,3 +38,14 @@ The Dashboard Appearance editor now supports per-widget value/label/secondary fo
 ## Version 12 — Free-position dashboard editor
 
 The Dashboard Appearance editor now includes a phone-shaped 9:20 canvas approximating the Samsung Galaxy S21 Ultra portrait screen. In edit mode, drag widgets by touching and moving the card, and resize using the lower-right handle. Positions and dimensions are saved locally and reused in full-screen presentation. Create custom widgets from available live data sources (SOG, COG, HEEL, TRIM, estimated wind direction, elapsed clock, GPS accuracy), choose number/bar/odometer presentation, then edit label, units, precision, colours, type sizes, visibility and bar options. Custom widgets are stored locally in this browser.
+
+
+## Version 13 — profiles, device setup and forecast map
+
+1. Open SailLab over HTTPS. Create a local profile and password, or sign into an existing profile on this browser.
+2. On first use, choose the device preset, useful CSS-pixel dimensions, and portrait/landscape orientation. This configures the editor preview; actual full-screen dimensions remain controlled by the device/browser.
+3. In Dashboard, save up to 10 named dashboard pages. Load or delete saved pages from the same panel. Pages are stored per local profile.
+4. In Appearance, drag widgets only from the small drag handle. Use the bottom-right resize handle to resize and the top-right lock button to lock/unlock that widget's position.
+5. Open MAP to see the current GPS position and pinged committee boat, pin and upwind mark. Choose ECMWF, GFS or ICON for the Windy forecast preview, or open PredictWind externally. The forecast provider may require internet access or a subscription.
+
+**Storage limitation:** profile passwords, dashboard pages and session records are stored locally in this browser. They are not cloud accounts and do not automatically sync to another phone. Do not rely on the local login for security against someone with access to the device/browser profile. Export regular backups.

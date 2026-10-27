@@ -56,3 +56,15 @@ The Dashboard Appearance editor now supports per-widget value/label/secondary fo
 ## Version 12 — Free-position dashboard editor
 
 The Dashboard Appearance editor now includes a phone-shaped 9:20 canvas approximating the Samsung Galaxy S21 Ultra portrait screen. In edit mode, drag widgets by touching and moving the card, and resize using the lower-right handle. Positions and dimensions are saved locally and reused in full-screen presentation. Create custom widgets from available live data sources (SOG, COG, HEEL, TRIM, estimated wind direction, elapsed clock, GPS accuracy), choose number/bar/odometer presentation, then edit label, units, precision, colours, type sizes, visibility and bar options. Custom widgets are stored locally in this browser.
+
+
+## Version 13 additions
+
+- Local profile login screen. Profiles and passwords are stored only in this browser; this is a convenience gate, not server-backed authentication or cloud sync.
+- Session records are tagged to the active local profile in IndexedDB and remain on the device until deleted or browser storage is cleared.
+- Save up to 10 named dashboard pages per profile. Each saved page captures widget preferences, custom widgets, layout preset and theme.
+- Device setup supports Samsung S21 Ultra, Samsung S21, iPhone, tablet, custom CSS-pixel dimensions and portrait/landscape preview. Full-screen orientation locking is best-effort and depends on browser support.
+- Widget placement uses a dedicated drag handle, resize handle and per-widget lock toggle to reduce accidental movement.
+- Weather map displays current position and pinged committee/pin/upwind marks. Windy model preview supports ECMWF, GFS and ICON; PredictWind opens externally. A provider API/licence is required to put SailLab markers directly on a third-party forecast map.
+
+Important: local profiles and sessions do not sync between devices. For secure authentication and cloud persistence, a backend service and user database are required.
