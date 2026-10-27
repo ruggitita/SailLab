@@ -51,4 +51,4 @@ The Dashboard Appearance editor now includes a phone-shaped 9:20 canvas approxim
 **Storage limitation:** profile passwords, dashboard pages and session records are stored locally in this browser. They are not cloud accounts and do not automatically sync to another phone. Do not rely on the local login for security against someone with access to the device/browser profile. Export regular backups.
 
 
-V16 updates: removed unavailable depth/temperature and unsupported motion-rate channels; added per-widget signed zero-centred bars, numeric markers, and configurable 0/0.5/1/2/3-second damping/averaging windows.
+V17 updates: removed unavailable depth/temperature and unsupported motion-rate channels; added per-widget signed zero-centred bars, numeric markers, and configurable 0/0.5/1/2/3-second damping/averaging windows.

@@ -70,4 +70,13 @@ The Dashboard Appearance editor now includes a phone-shaped 9:20 canvas approxim
 Important: local profiles and sessions do not sync between devices. For secure authentication and cloud persistence, a backend service and user database are required.
 
 
-V16 updates: removed unavailable depth/temperature and unsupported motion-rate channels; added per-widget signed zero-centred bars, numeric markers, and configurable 0/0.5/1/2/3-second damping/averaging windows.
+V17 updates: removed unavailable depth/temperature and unsupported motion-rate channels; added per-widget signed zero-centred bars, numeric markers, and configurable 0/0.5/1/2/3-second damping/averaging windows.
+
+
+## Prestart and physical-key shortcuts (V18)
+
+- The Dashboard includes a **Prestart** preset with a dedicated countdown strip.
+- When the countdown reaches zero, SailLab waits for Volume Up to start the dedicated race chronometer view.
+- Best-effort volume-key shortcuts when the browser exposes those key events: Volume Up once after countdown expiry starts the chronometer; double Volume Up adds one minute (after expiry it starts a 60-second countdown); triple Volume Up pings the pin end. Volume Down once syncs down to the previous whole minute; double Volume Down resets the countdown; triple Volume Down pings the committee end.
+- Double-clicking the on-screen **Lock screen** button records a quick flag. A single click locks the Dashboard.
+- **Browser limitation:** standard Android Chrome/PWA does not reliably expose hardware volume keys and cannot intercept the physical power/lock button. These shortcuts are best-effort only; reliable system-wide hardware-key handling would require a native Android wrapper.
