@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const DB_NAME='SailLabDB', DB_VERSION=1, STORE='sessions';
 let db, watchId=null, current=null, timerId=null, lastFix=null, lastSampleAt=null, sessionStartMs=null, elapsedBeforePause=0, paused=false, samples=[], events=[], tackSegments={port:[],starboard:[]}, activeTack=null, toastTimer, motion={heel:null,pitch:null,enabled:false};
-let lastFixSogKnots=null, lastValidSogFix=null;
+let lastFixSogKnots=null, lastValidSogFix=null, lastDerivedSogKnots=null, lastDerivedSogAt=0;
 let dockTunePhotos=[];
 let heelHistory=[],pitchHistory=[],sogHistory=[],courseHistory=[],autoWindTimer=null,autoWindState={direction:null,portCourse:null,starboardCourse:null,quality:'Waiting for stable GPS course legs',updatedAt:null,attemptedAt:null};
 let savedFlags=JSON.parse(localStorage.getItem('saillabFlags')||'[]');
@@ -409,8 +409,8 @@ async function start(){if(current&&current.status==='recording'){toast('Session 
  else{sessionStartMs=Date.now();paused=false}
  updateControls();requestGps();timerId=setInterval(()=>{if(current&&!paused){$('duration').textContent=fmtTime(elapsed());saveCurrent().catch(console.error)}},5000);toast('Recording started')}
 function requestGps(){if(watchId!==null)return;watchId=navigator.geolocation.watchPosition(pos=>{lastFix=pos;const c=pos.coords;const speed=estimateSogFromFix(pos);lastFixSogKnots=speed;if(Number.isFinite(speed)){sogHistory.push({t:pos.timestamp||Date.now(),value:speed});sogHistory=sogHistory.filter(x=>(Date.now()-x.t)<=60000)}if(Number.isFinite(c.heading)){courseHistory.push({t:pos.timestamp||Date.now(),course:c.heading,accuracy:c.accuracy});courseHistory=courseHistory.filter(x=>Date.now()-x.t<=240000)}const sample={t:pos.timestamp||Date.now(),lat:c.latitude,lon:c.longitude,alt:c.altitude==null?null:c.altitude,accuracy:c.accuracy==null?null:c.accuracy,sog:speed,course:c.heading==null?null:c.heading,heel:correctedMotion('heel'),pitch:correctedMotion('pitch')};if(current&&!paused){samples.push(sample);current.samples=samples;if(samples.length>100000){samples.shift()}if(lastSampleAt){const dt=(sample.t-lastSampleAt)/1000;if(dt>0&&$('sampleRate'))$('sampleRate').textContent=(1/dt).toFixed(1)+' Hz effective'}lastSampleAt=sample.t;updateStats();if(activeTack){const prev=activeTack.last;if(prev&&sample.course!=null)activeTack.courseSamples.push(sample.course);activeTack.last=sample;activeTack.distance+=prev?distanceNm(prev,sample):0;activeTack.samples.push(sample)}}
- $('gpsBadge').className='status ok';$('gpsBadge').innerHTML='<span class="dot"></span> GPS active';if($('sog'))$('sog').textContent=widgetNumber('live-sog',speed,1);if($('course'))$('course').textContent=widgetNumber('live-course',sample.course,0);if($('accuracy'))$('accuracy').textContent=sample.accuracy==null?'—':Math.round(sample.accuracy);if($('coords'))$('coords').textContent=`${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)}`;if($('samples'))$('samples').textContent=samples.length;if(typeof updateRaceMetrics==='function')updateRaceMetrics();if(typeof renderCockpit==='function')renderCockpit();},err=>{$('gpsBadge').className='status bad';$('gpsBadge').innerHTML='<span class="dot"></span> GPS unavailable';toast(({1:'GPS permission denied. Check your browser settings.',2:'GPS signal unavailable.',3:'GPS timed out. Try again outdoors.'})[err.code]||'GPS error');if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}lastFixSogKnots=null;lastValidSogFix=null;if($('settingsGpsToggle'))$('settingsGpsToggle').textContent='Enable GPS'}, {enableHighAccuracy:true,maximumAge:1000,timeout:20000})}
-function stopGps(){if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}lastValidSogFix=null;lastFixSogKnots=null}
+ $('gpsBadge').className='status ok';$('gpsBadge').innerHTML='<span class="dot"></span> GPS active';if($('sog'))$('sog').textContent=widgetNumber('live-sog',speed,1);if($('course'))$('course').textContent=widgetNumber('live-course',sample.course,0);if($('accuracy'))$('accuracy').textContent=sample.accuracy==null?'—':Math.round(sample.accuracy);if($('coords'))$('coords').textContent=`${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)}`;if($('samples'))$('samples').textContent=samples.length;if(typeof updateRaceMetrics==='function')updateRaceMetrics();if(typeof renderCockpit==='function')renderCockpit();},err=>{$('gpsBadge').className='status bad';$('gpsBadge').innerHTML='<span class="dot"></span> GPS unavailable';toast(({1:'GPS permission denied. Check your browser settings.',2:'GPS signal unavailable.',3:'GPS timed out. Try again outdoors.'})[err.code]||'GPS error');if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}lastFixSogKnots=null;lastValidSogFix=null;lastDerivedSogKnots=null;lastDerivedSogAt=0;if($('settingsGpsToggle'))$('settingsGpsToggle').textContent='Enable GPS'}, {enableHighAccuracy:true,maximumAge:1000,timeout:20000})}
+function stopGps(){if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}lastValidSogFix=null;lastFixSogKnots=null;lastDerivedSogKnots=null;lastDerivedSogAt=0}
 function updateControls(){const active=!!current&&current.status==='recording';$('startBtn').disabled=active;$('pauseBtn').disabled=!active;$('resumeBtn').disabled=!(current&&paused);$('stopBtn').disabled=!current||!['recording','paused'].includes(current.status)}
 async function pause(){if(!current||paused)return;elapsedBeforePause=elapsed();paused=true;sessionStartMs=null;await saveCurrent();updateControls();toast('Session paused')}
 async function resume(){if(!current||!paused)return;sessionStartMs=Date.now();paused=false;await saveCurrent();updateControls();requestGps();toast('Recording resumed')}
@@ -424,14 +424,20 @@ function estimateSogFromFix(pos){
  const t=Number.isFinite(pos.timestamp)?pos.timestamp:Date.now();
  const accuracy=Number.isFinite(c.accuracy)?c.accuracy:999;
  let native=Number.isFinite(c.speed)&&c.speed>=0?c.speed*KNOTS_PER_MS:null;
- let derived=null;
+ let derived=null,updateBaseline=true;
  if(lastValidSogFix){const dt=(t-lastValidSogFix.t)/1000;const prev=lastValidSogFix;const goodAcc=accuracy<=50&&prev.accuracy<=50;
-  if(dt>=0.6&&dt<=15&&goodAcc){const metres=distanceNm({lat:prev.lat,lon:prev.lon},{lat:c.latitude,lon:c.longitude})*1852;const noiseFloor=Math.max(1.2,Math.min(5,(accuracy+prev.accuracy)*0.18));if(metres>noiseFloor)derived=(metres/dt)*KNOTS_PER_MS;}
+  if(dt>=0.6&&dt<=15&&goodAcc){
+   const metres=distanceNm({lat:prev.lat,lon:prev.lon},{lat:c.latitude,lon:c.longitude})*1852;
+   const noiseFloor=Math.max(1.2,Math.min(5,(accuracy+prev.accuracy)*0.18));
+   if(metres>noiseFloor)derived=(metres/dt)*KNOTS_PER_MS;
+   else updateBaseline=dt>=12; // Accumulate small per-fix movements instead of losing them to GPS noise.
+  }
  }
  // Prefer Android's GNSS speed when it is credible; on Samsung browsers it may be null or remain zero while moving.
- let result=(native!=null&&native>0.25)?native:(derived!=null?derived:native);
+ if(derived!=null){lastDerivedSogKnots=derived;lastDerivedSogAt=t;}
+ let result=(native!=null&&native>0.25)?native:(derived!=null?derived:(native===0&&lastDerivedSogKnots!=null&&t-lastDerivedSogAt<=4000?lastDerivedSogKnots:native));
  if(result!=null&&(!Number.isFinite(result)||result>80))result=null;
- if(accuracy<=50){lastValidSogFix={t,lat:c.latitude,lon:c.longitude,accuracy};}
+ if(accuracy<=50&&updateBaseline){lastValidSogFix={t,lat:c.latitude,lon:c.longitude,accuracy};}
  return result;
 }
 function stats(){const a=samples.map(s=>s.sog).filter(Number.isFinite).sort((x,y)=>x-y);if(!a.length)return {n:0,mean:null,std:null,median:null};const mean=a.reduce((x,y)=>x+y,0)/a.length;return {n:a.length,mean,std:Math.sqrt(a.reduce((sum,x)=>sum+(x-mean)**2,0)/a.length),median:a.length%2?a[(a.length-1)/2]:(a[a.length/2-1]+a[a.length/2])/2,min:a[0],max:a[a.length-1]}}

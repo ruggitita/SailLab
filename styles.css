@@ -343,3 +343,18 @@ body.dashboard-fullscreen #dashboardGrid.free-position-canvas .canvas-drag-handl
 .start-mode-hero .button-row button{flex:1;min-width:130px}
 .start-mode-view .race-metrics .metric strong{font-variant-numeric:tabular-nums}
 @media(max-width:390px){.prestart-strip{padding:10px;align-items:flex-start}.prestart-strip button{font-size:10px;padding:7px}.prestart-strip small{max-width:190px}.start-mode-hero>strong{font-size:clamp(54px,15vw,76px)}}
+
+/* SailLab v21: clean lock screen — show only the configured phone dashboard and its readings. */
+body.app-locked #dashboardPagesPanel,
+body.app-locked #dashboardEditor,
+body.app-locked .dashboard-presets,
+body.app-locked .dashboard-actions,
+body.app-locked #exitDashboardBtn,
+body.app-locked .phone-preview-label,
+body.app-locked #tapProgress,
+body.app-locked #toast,
+body.app-locked #prestartHint,
+body.app-locked #prestartOpenRace{display:none!important}
+body.app-locked #view-cockpit>.section-head{display:none!important}
+body.app-locked #dashboardPhoneFrame{margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+body.app-locked #dashboardGrid{margin:0!important}
