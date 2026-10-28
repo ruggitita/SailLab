@@ -358,3 +358,15 @@ body.app-locked #prestartOpenRace{display:none!important}
 body.app-locked #view-cockpit>.section-head{display:none!important}
 body.app-locked #dashboardPhoneFrame{margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
 body.app-locked #dashboardGrid{margin:0!important}
+
+/* SailLab V22: Dashboard home focuses on saved pages; edit widgets only in Appearance. */
+body:not(.dashboard-editing):not(.dashboard-fullscreen) #view-cockpit .dashboard-presets,
+body:not(.dashboard-editing):not(.dashboard-fullscreen) #view-cockpit #dashboardPhoneFrame{display:none!important}
+.appearance-presets{margin:0 0 12px;padding:12px;border-color:#2b5a55;background:color-mix(in srgb,var(--panel2) 70%,var(--panel))}
+.appearance-presets h4{margin:0 0 6px}.appearance-preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:10px 0}.appearance-preset-grid button{min-height:42px}.appearance-file-actions{display:flex;gap:8px;flex-wrap:wrap}.file-button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);font-size:12px;font-weight:700;cursor:pointer}
+.gps-help-panel{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--panel2);margin:10px 0}.gps-help-panel p{line-height:1.5}.gps-help-panel .button-row{margin-bottom:8px}
+body.app-locked #tapProgress{display:none!important}
+body.app-locked #dashboardPhoneFrame{display:block!important}
+body.app-locked #dashboardGrid.free-position-canvas>[data-widget]{border-radius:0!important}
+body.app-locked #prestartStrip,
+body.app-locked #dashboardGrid button{display:none!important}

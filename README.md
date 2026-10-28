@@ -80,3 +80,10 @@ V17 updates: removed unavailable depth/temperature and unsupported motion-rate c
 - Best-effort volume-key shortcuts when the browser exposes those key events: Volume Up once after countdown expiry starts the chronometer; double Volume Up adds one minute (after expiry it starts a 60-second countdown); triple Volume Up pings the pin end. Volume Down once syncs down to the previous whole minute; double Volume Down resets the countdown; triple Volume Down pings the committee end.
 - Double-clicking the on-screen **Lock screen** button records a quick flag. A single click locks the Dashboard.
 - **Browser limitation:** standard Android Chrome/PWA does not reliably expose hardware volume keys and cannot intercept the physical power/lock button. These shortcuts are best-effort only; reliable system-wide hardware-key handling would require a native Android wrapper.
+
+## Version 22 — Samsung GPS diagnostics and robust saved dashboards
+- Added a GPS permission/status diagnostic and Samsung Android Location troubleshooting checklist. A web app cannot toggle Android's system Location switch directly.
+- Fixed long-press unlocking by removing pointer capture that could cancel the hold gesture; added window-level release/cancel handling.
+- Saved dashboard snapshots now preserve widget canvas coordinates, dimensions, device aspect configuration, theme, and custom widget definitions when loaded and on profile restore.
+- Dashboard home now focuses on saved pages; widget editing and the five full-canvas presets live in Appearance.
+- Added JSON import/export for dashboard pages. Five presets tile the phone canvas without empty regions between widgets.
